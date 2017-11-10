@@ -424,8 +424,9 @@ void loop(void) {
       double t = temp ; //Data ends up in the wrong car for no goddamn reason I can think of.  Code in xmit IDs for each variable later.
       temp = hum;
       hum = t;
-      
-      printf("Just read temp=%i.%i, hum=%i.%i\n", int(temp), int(temp * 10) % 10, int(hum), int(hum * 10) % 10);
+
+      printf(millis() / 1000 / 60);
+      printf(";%i.%i;%i.%i\n", int(temp), int(temp * 10) % 10, int(hum), int(hum * 10) % 10);
       
     }
     // Delay just a little bit to let the other unit
