@@ -238,6 +238,7 @@ void setup(void) {
 
   printf_begin();
   printf("ROLE: %s\n\r", role_friendly_name[role]);
+  printf("CSV Data Format is degC;RH;secondsElapsed\n\n");
 
   //
   // Setup and configure rf radio
@@ -314,7 +315,6 @@ void loop(void) {
            int(initHum * 10) % 10);
 
     while (role == role_satellite) {
-
       // Read the temp and humidity, and send two packets of type double whenever the change is sufficient.
       readData();
 
@@ -425,8 +425,8 @@ void loop(void) {
       temp = hum;
       hum = t;
 
-      printf(millis() / 1000 / 60);
-      printf(";%i.%i;%i.%i\n", int(temp), int(temp * 10) % 10, int(hum), int(hum * 10) % 10);
+      unsigned long int seconds = (millis() / 1000);
+      printf("%i.%i;%i.%i;%u\n", int(temp), int(temp * 10) % 10, int(hum), int(hum * 10) % 10, seconds);
       
     }
     // Delay just a little bit to let the other unit
