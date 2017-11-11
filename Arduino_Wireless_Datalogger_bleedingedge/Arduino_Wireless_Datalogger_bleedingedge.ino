@@ -378,36 +378,20 @@ void loop(void) {
   //
 
   if (role == role_base) {
-
+    
+    Transmission received(0.0,0.0);
 
     if (radio.available()) {
-      double temp = 0.0;
-      double hum = 0.0;
-      bool tempReceived = false;
-      bool humReceived = false;
-      while (!tempReceived) {
-        // Fetch the payload, and see if this was the last one.
-        tempReceived = radio.read(&temp, sizeof(double));
-
-
-      }
-       //printf("temp=%i.%i", int(temp), int(temp * 10) % 10);
-       
-      while (!humReceived) {
-        if (radio.available()) {
-          humReceived = radio.read(&hum, sizeof(double));
-          //printf("hum=%i.%i\n", int(hum), int(hum * 10) % 10);
-        }
-      }
-     
-      double t = temp ; //Data ends up in the wrong car for no goddamn reason I can think of.  Code in xmit IDs for each variable later.
-      temp = hum;
-      hum = t;
-
-      printf(millis() / 1000 / 60);
-      printf(";%i.%i;%i.%i\n", int(temp), int(temp * 10) % 10, int(hum), int(hum * 10) % 10);
+    
+      radio.read(&received, sizeof(received));
       
-    }
+      }
+
+      received.printCSV();
+      
+      //printf(millis() / 1000 / 60);
+      //printf(";%i.%i;%i.%i\n", int(temp), int(temp * 10) % 10, int(hum), int(hum * 10) % 10);
+      
     // Delay just a little bit to let the other unit
     // make the transition to receiver
     delay(20);
