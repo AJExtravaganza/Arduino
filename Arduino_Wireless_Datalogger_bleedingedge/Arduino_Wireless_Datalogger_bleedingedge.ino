@@ -5,23 +5,32 @@
 //// Remember to comment out debug for final deployment
 //// Why is it sending non-changed packets?  Investigate.
 
+
+#include <Wire.h>
 #include <SPI.h>
 #include "nRF24L01.h"
 #include "RF24.h"
 #include "printf.h"
 
-#include <dht.h>
+struct Transmission {
+  int tempRaw = 0;
+  int humRaw = 0;
+  Transmission(double temp, double hum) : tempRaw(int(temp * 100)), humRaw(int(hum * 100)) {
+    
+  }
+  float getTemp() { return float(tempRaw) / 100.0;}
+  float getHum() { return float(humRaw) / 100.0;}
+  void printCSV() { printf("%f;%f;%i\n", getTemp(), getHum(), millis() / 1000);}
+};
 
 //
 // Hardware configuration
 //
 
-dht DHT;
 const double TEMPHYSTERESIS = 0.5;  // Change in temp or humi must exceed this magnitude to trigger an update
 const double HUMHYSTERESIS = 0.5; // Calibration factor applied to temp measurement
 
 ////BME280 && SPI stuff
-#include <Wire.h>
 
 #define BME280_ADDRESS 0x76
 unsigned long int hum_raw, temp_raw, pres_raw;
@@ -286,10 +295,6 @@ void setup(void) {
 
 void loop(void) {
   
-  //
-  // xmitter role.  Update sensor values, then send them together as an int of format TTHH if they have changed
-  //
-  
   if (role == role_satellite) {
     double temp_act = 0.0, hum_act = 0.0;
     signed long int temp_cal;
@@ -329,18 +334,7 @@ void loop(void) {
 
       del_temp_act = temp_act - prev_temp_act;
       del_hum_act = hum_act - prev_hum_act;
-
-      /*
-     printf("HYS*100: %i\n", (int(TEMPHYSTERESIS*100)));
-     
-     printf("temp*100: %i\n", int(temp_act* 100));
-     printf("prev_temp*100: %i\n", int(prev_temp_act* 100));
-     printf("del_temp*100: %i\n", int(del_temp_act* 100));
-     
-     printf("hum*100: %i\n", int(hum_act* 100));
-     printf("prev_hum*100: %i\n", int(prev_hum_act* 100));
-     printf("del_hum*100: %i\n\n", int(del_hum_act* 100));
-     */
+      
       // Only transmit if the temp or humi has changed sufficiently since last xmit
       if (abs(del_temp_act) > TEMPHYSTERESIS || abs(del_hum_act) > HUMHYSTERESIS) {
 
@@ -400,7 +394,8 @@ void loop(void) {
   //
 
   if (role == role_base) {
-    // if there is data ready
+
+
     if (radio.available()) {
       double temp = 0.0;
       double hum = 0.0;
