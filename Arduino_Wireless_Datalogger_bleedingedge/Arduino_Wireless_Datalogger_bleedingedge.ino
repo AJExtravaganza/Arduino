@@ -21,10 +21,8 @@ struct Transmission {
   float getTemp() { return float(tempRaw) / 100.0;}
   float getHum() { return float(humRaw) / 100.0;}
   bool changed( Transmission other, float tempHys, float humHys) {return (abs(getTemp() - other.getTemp()) > tempHys || abs(getHum() - other.getHum()) > humHys); }
-  void printCSV() { unsigned long int seconds = millis();
-  seconds = seconds / 10;
-    printf("%i.%i;%i.%i;%u\n", int(getTemp()), int(getTemp() * 10) % 10, int(getHum()),
-             int(getHum() * 10) % 10), seconds;}
+  void printCSV() {printf("%i.%i;%i.%i\n", int(getTemp()), int(getTemp() * 10) % 10, int(getHum()),
+              int(getHum() * 10) % 10);}
 };
 
 //
@@ -246,7 +244,7 @@ void setup(void) {
   //
 
   if (true) { // Change to detect BME280 on SPI bus
-    role = role_satellite;//////////////////////////////////////////////////////////////////////////////////////////////////////
+    role = role_base;//////////////////////////////////////////////////////////////////////////////////////////////////////
   }
 
   printf_begin();
@@ -382,15 +380,13 @@ void loop(void) {
     Transmission received(0.0,0.0);
 
     if (radio.available()) {
-    
-      radio.read(&received, sizeof(received));
       
-      }
+      radio.read(&received, sizeof(received));
 
+      printf("%lu;", (millis() / 1000)); // Timestamp (seconds since base start)
       received.printCSV();
       
-      //printf(millis() / 1000 / 60);
-      //printf(";%i.%i;%i.%i\n", int(temp), int(temp * 10) % 10, int(hum), int(hum * 10) % 10);
+      }
       
     // Delay just a little bit to let the other unit
     // make the transition to receiver
