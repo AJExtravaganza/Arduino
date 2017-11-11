@@ -20,15 +20,19 @@ struct Transmission {
   }
   float getTemp() { return float(tempRaw) / 100.0;}
   float getHum() { return float(humRaw) / 100.0;}
-  void printCSV() { printf("%f;%f;%i\n", getTemp(), getHum(), millis() / 1000);}
+  bool changed( Transmission other, float tempHys, float humHys) {return (abs(getTemp() - other.getTemp()) > tempHys || abs(getHum() - other.getHum()) > humHys); }
+  void printCSV() { unsigned long int seconds = millis();
+  seconds = seconds / 10;
+    printf("%i.%i;%i.%i;%u\n", int(getTemp()), int(getTemp() * 10) % 10, int(getHum()),
+             int(getHum() * 10) % 10), seconds;}
 };
 
 //
 // Hardware configuration
 //
 
-const double TEMPHYSTERESIS = 0.5;  // Change in temp or humi must exceed this magnitude to trigger an update
-const double HUMHYSTERESIS = 0.5; // Calibration factor applied to temp measurement
+const float TEMPHYS = 0.5;  // Hysteresis values
+const float HUMHYS = 0.5; 
 
 ////BME280 && SPI stuff
 
@@ -242,7 +246,7 @@ void setup(void) {
   //
 
   if (true) { // Change to detect BME280 on SPI bus
-    role = role_base;//////////////////////////////////////////////////////////////////////////////////////////////////////
+    role = role_satellite;//////////////////////////////////////////////////////////////////////////////////////////////////////
   }
 
   printf_begin();
@@ -299,24 +303,25 @@ void loop(void) {
     double temp_act = 0.0, hum_act = 0.0;
     signed long int temp_cal;
     unsigned long int hum_cal;
+    Transmission prevPayload(0.0,0.0);
 
     readData();
 
     temp_cal = calibration_T(temp_raw);
     hum_cal = calibration_H(hum_raw);
 
-    double initTemp = (double) temp_cal / 100.0;
-    double initHum = (double) hum_cal / 1024.0;
+    //double initTemp = (double) temp_cal / 100.0;
+    //double initHum = (double) hum_cal / 1024.0;
 
 
-    double prev_temp_act = 0;
-    double prev_hum_act = 0;
+    //double prev_temp_act = 0;
+    //double prev_hum_act = 0;
 
     double del_temp_act = 0;
     double del_hum_act = 0;
 
-    printf("Init with T=%i.%i, H=%i.%i\n", int(initTemp), int(initTemp * 10) % 10, int(initHum),
-           int(initHum * 10) % 10);
+    //printf("Init with T=%i.%i, H=%i.%i\n", int(initTemp), int(initTemp * 10) % 10, int(initHum),
+   //        int(initHum * 10) % 10);
 
     while (role == role_satellite) {
 
@@ -325,61 +330,40 @@ void loop(void) {
 
       temp_cal = calibration_T(temp_raw); //Get raw values from BME280
       hum_cal = calibration_H(hum_raw);
-
       temp_act = (double) temp_cal / 100.0; //Convert raw values to actual.  use round(value*10)/10(.0?) to get 1dp
       hum_act = (double) hum_cal / 1024.0;
 
       printf("Just read temp=%i.%i, hum=%i.%i\n", int(temp_act), int(temp_act * 10) % 10, int(hum_act),
              int(hum_act * 10) % 10);
 
-      del_temp_act = temp_act - prev_temp_act;
-      del_hum_act = hum_act - prev_hum_act;
+      Transmission latest(temp_act, hum_act);
       
-      // Only transmit if the temp or humi has changed sufficiently since last xmit
-      if (abs(del_temp_act) > TEMPHYSTERESIS || abs(del_hum_act) > HUMHYSTERESIS) {
+      if (latest.changed(prevPayload, TEMPHYS, HUMHYS)) {
+        bool delivered = false;
+        
+        radio.stopListening();
 
-        tempDelivered = false; //There is a new temperature value to send
-        humDelivered = false;
+        while (!delivered) {
 
-        while (!tempDelivered) {
+          printf("Now sending ");
+          latest.printCSV();
+          
+          delivered = radio.write(&latest, sizeof(latest));
 
-
-          // Stop listening so we can talk.
-          radio.stopListening();
-
-          printf("Now sending temp %i.%i...", int(temp_act), int(temp_act * 10) % 10);
-          tempDelivered = radio.write(&temp_act, sizeof(double));
-
-          if (tempDelivered) {
+          if (delivered) {
             printf("ok...\n");
           }
           else {
             printf("failed.\n\r");
           }
         }
-        prev_temp_act = temp_act;
+        prevPayload = latest;
 
-        radio.write(0,0); // This can fix a failed subsequent xmit if radio.available isn't called on read.
-
-        while (!humDelivered) {
-          printf("Now sending hum %i.%i...", int(hum_act), int(hum_act * 10) % 10);
-          humDelivered = radio.write(&hum_act, sizeof(double));
-
-          if (humDelivered) {
-            printf("ok...\n\n");
-          }
-          else {
-            printf("failed.\n\r");
-          }
-        }
-        prev_hum_act = hum_act;
-
-      }
-
+        //radio.write(0,0); // This can fix a failed subsequent xmit if radio.available isn't called on read.
 
       // Continue listening
       radio.startListening();
-
+      }
       // Try again 30s later
       delay(1000); // Loop poll rate.  Adjust sensor poll rate later to match to reduce power consumption.
     }
