@@ -5,23 +5,34 @@
 //// Remember to comment out debug for final deployment
 //// Why is it sending non-changed packets?  Investigate.
 
+
+#include <Wire.h>
 #include <SPI.h>
 #include "nRF24L01.h"
 #include "RF24.h"
 #include "printf.h"
 
-#include <dht.h>
+struct Transmission {
+  int tempRaw = 0;
+  int humRaw = 0;
+  Transmission(double temp, double hum) : tempRaw(int(temp * 100)), humRaw(int(hum * 100)) {
+    
+  }
+  float getTemp() { return float(tempRaw) / 100.0;}
+  float getHum() { return float(humRaw) / 100.0;}
+  bool changed( Transmission other, float tempHys, float humHys) {return (abs(getTemp() - other.getTemp()) > tempHys || abs(getHum() - other.getHum()) > humHys); }
+  void printCSV() {printf("%i.%i;%i.%i\n", int(getTemp()), int(getTemp() * 10) % 10, int(getHum()),
+              int(getHum() * 10) % 10);}
+};
 
 //
 // Hardware configuration
 //
 
-dht DHT;
-const double TEMPHYSTERESIS = 0.5;  // Change in temp or humi must exceed this magnitude to trigger an update
-const double HUMHYSTERESIS = 0.5; // Calibration factor applied to temp measurement
+const float TEMPHYS = 0.5;  // Hysteresis values
+const float HUMHYS = 0.5; 
 
 ////BME280 && SPI stuff
-#include <Wire.h>
 
 #define BME280_ADDRESS 0x76
 unsigned long int hum_raw, temp_raw, pres_raw;
@@ -238,7 +249,6 @@ void setup(void) {
 
   printf_begin();
   printf("ROLE: %s\n\r", role_friendly_name[role]);
-  printf("CSV Data Format is degC;RH;secondsElapsed\n\n");
 
   //
   // Setup and configure rf radio
@@ -287,105 +297,71 @@ void setup(void) {
 
 void loop(void) {
   
-  //
-  // xmitter role.  Update sensor values, then send them together as an int of format TTHH if they have changed
-  //
-  
   if (role == role_satellite) {
     double temp_act = 0.0, hum_act = 0.0;
     signed long int temp_cal;
     unsigned long int hum_cal;
+    Transmission prevPayload(0.0,0.0);
 
     readData();
 
     temp_cal = calibration_T(temp_raw);
     hum_cal = calibration_H(hum_raw);
 
-    double initTemp = (double) temp_cal / 100.0;
-    double initHum = (double) hum_cal / 1024.0;
+    //double initTemp = (double) temp_cal / 100.0;
+    //double initHum = (double) hum_cal / 1024.0;
 
 
-    double prev_temp_act = 0;
-    double prev_hum_act = 0;
+    //double prev_temp_act = 0;
+    //double prev_hum_act = 0;
 
     double del_temp_act = 0;
     double del_hum_act = 0;
 
-    printf("Init with T=%i.%i, H=%i.%i\n", int(initTemp), int(initTemp * 10) % 10, int(initHum),
-           int(initHum * 10) % 10);
+    //printf("Init with T=%i.%i, H=%i.%i\n", int(initTemp), int(initTemp * 10) % 10, int(initHum),
+   //        int(initHum * 10) % 10);
 
     while (role == role_satellite) {
+
       // Read the temp and humidity, and send two packets of type double whenever the change is sufficient.
       readData();
 
       temp_cal = calibration_T(temp_raw); //Get raw values from BME280
       hum_cal = calibration_H(hum_raw);
-
       temp_act = (double) temp_cal / 100.0; //Convert raw values to actual.  use round(value*10)/10(.0?) to get 1dp
       hum_act = (double) hum_cal / 1024.0;
 
       printf("Just read temp=%i.%i, hum=%i.%i\n", int(temp_act), int(temp_act * 10) % 10, int(hum_act),
              int(hum_act * 10) % 10);
 
-      del_temp_act = temp_act - prev_temp_act;
-      del_hum_act = hum_act - prev_hum_act;
+      Transmission latest(temp_act, hum_act);
+      
+      if (latest.changed(prevPayload, TEMPHYS, HUMHYS)) {
+        bool delivered = false;
+        
+        radio.stopListening();
 
-      /*
-     printf("HYS*100: %i\n", (int(TEMPHYSTERESIS*100)));
-     
-     printf("temp*100: %i\n", int(temp_act* 100));
-     printf("prev_temp*100: %i\n", int(prev_temp_act* 100));
-     printf("del_temp*100: %i\n", int(del_temp_act* 100));
-     
-     printf("hum*100: %i\n", int(hum_act* 100));
-     printf("prev_hum*100: %i\n", int(prev_hum_act* 100));
-     printf("del_hum*100: %i\n\n", int(del_hum_act* 100));
-     */
-      // Only transmit if the temp or humi has changed sufficiently since last xmit
-      if (abs(del_temp_act) > TEMPHYSTERESIS || abs(del_hum_act) > HUMHYSTERESIS) {
+        while (!delivered) {
 
-        tempDelivered = false; //There is a new temperature value to send
-        humDelivered = false;
+          printf("Now sending ");
+          latest.printCSV();
+          
+          delivered = radio.write(&latest, sizeof(latest));
 
-        while (!tempDelivered) {
-
-
-          // Stop listening so we can talk.
-          radio.stopListening();
-
-          printf("Now sending temp %i.%i...", int(temp_act), int(temp_act * 10) % 10);
-          tempDelivered = radio.write(&temp_act, sizeof(double));
-
-          if (tempDelivered) {
+          if (delivered) {
             printf("ok...\n");
           }
           else {
             printf("failed.\n\r");
           }
         }
-        prev_temp_act = temp_act;
+        prevPayload = latest;
 
-        radio.write(0,0); // This can fix a failed subsequent xmit if radio.available isn't called on read.
-
-        while (!humDelivered) {
-          printf("Now sending hum %i.%i...", int(hum_act), int(hum_act * 10) % 10);
-          humDelivered = radio.write(&hum_act, sizeof(double));
-
-          if (humDelivered) {
-            printf("ok...\n\n");
-          }
-          else {
-            printf("failed.\n\r");
-          }
-        }
-        prev_hum_act = hum_act;
-
-      }
-
+        //radio.write(0,0); // This can fix a failed subsequent xmit if radio.available isn't called on read.
 
       // Continue listening
       radio.startListening();
-
+      }
       // Try again 30s later
       delay(1000); // Loop poll rate.  Adjust sensor poll rate later to match to reduce power consumption.
     }
@@ -400,35 +376,18 @@ void loop(void) {
   //
 
   if (role == role_base) {
-    // if there is data ready
+    
+    Transmission received(0.0,0.0);
+
     if (radio.available()) {
-      double temp = 0.0;
-      double hum = 0.0;
-      bool tempReceived = false;
-      bool humReceived = false;
-      while (!tempReceived) {
-        // Fetch the payload, and see if this was the last one.
-        tempReceived = radio.read(&temp, sizeof(double));
-
-
-      }
-       //printf("temp=%i.%i", int(temp), int(temp * 10) % 10);
-       
-      while (!humReceived) {
-        if (radio.available()) {
-          humReceived = radio.read(&hum, sizeof(double));
-          //printf("hum=%i.%i\n", int(hum), int(hum * 10) % 10);
-        }
-      }
-     
-      double t = temp ; //Data ends up in the wrong car for no goddamn reason I can think of.  Code in xmit IDs for each variable later.
-      temp = hum;
-      hum = t;
-
-      unsigned long int seconds = (millis() / 1000);
-      printf("%i.%i;%i.%i;%u\n", int(temp), int(temp * 10) % 10, int(hum), int(hum * 10) % 10, seconds);
       
-    }
+      radio.read(&received, sizeof(received));
+
+      printf("%lu;", (millis() / 1000)); // Timestamp (seconds since base start)
+      received.printCSV();
+      
+      }
+      
     // Delay just a little bit to let the other unit
     // make the transition to receiver
     delay(20);
