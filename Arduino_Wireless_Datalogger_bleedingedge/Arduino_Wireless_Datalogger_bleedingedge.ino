@@ -90,7 +90,7 @@ void setup(void) {
   //
 
   printf_begin();
-  printf("ROLE: %s\n\r", role_friendly_name[role]);
+  printf("ROLE: %s with ID %i\n\r", role_friendly_name[role], settings.deviceID);
 
   //
   // Setup and configure rf radio

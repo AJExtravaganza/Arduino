@@ -1,14 +1,16 @@
 #ifndef DEVICESETTINGS
 #define DEVICESETTINGS
 
+#include "EEPROMAnything.h"
+
 struct DeviceSettings {
   byte deviceID;
 
   DeviceSettings() : deviceID(0){}
   DeviceSettings(int deviceID) : deviceID(byte(deviceID)) {}
 
-  void read() {*this = EEPROM.read(0);}
-  void write() {EEPROM.write(0, this);}
+  void read() {EEPROM_readAnything(0, *this);}
+  void write() {EEPROM_writeAnything(0, *this);}
 
   
 };
