@@ -23,15 +23,11 @@
 
 const float TEMPHYS = 0.5;  // Hysteresis values
 const float HUMHYS = 0.5; 
-
-////BME280 && SPI stuff
-
-
+bool tempDelivered = false; //Only used for satellites.  Declared here for persistence over different loop() iterations
+bool humDelivered = false;  // Move these to one of the infinite internal loops at a later date
 
 // Set up nRF24L01 radio on SPI bus plus pins 9 & 10 
 RF24 radio(9, 10);
-bool tempDelivered = false; //Only used for satellites.  Declared here for persistence over different loop() iterations
-bool humDelivered = false;
 
 
 //
@@ -40,7 +36,6 @@ bool humDelivered = false;
 
 // Radio pipe addresses for the 2 nodes to communicate.
 const uint64_t pipes[2] = {0xF0F0F0F0E1LL, 0xF0F0F0F0D2LL};
-
 
 
 //
@@ -58,14 +53,17 @@ typedef enum {
 // The debug-friendly names of those roles
 const char* role_friendly_name[] = {"invalid", "base", "satellite"};
 
-//Load settings and establish role
 
-DeviceSettings settings = DeviceSettings();
-//settings = DeviceSettings(); //Load settings from EEPROM
-role_e role = role_base;//settings.deviceID == 0 ? role_base : role_satellite; //Sets the role based on the EEPROM setting.
+// Declare role
+role_e role = role_base;
 
 
 void setup(void) {
+  ////Load settings from EEPROM and assign role
+  DeviceSettings settings;
+  settings.read();
+  role = settings.deviceID == 0 ? role_base : role_satellite;
+  
   ////BME280 and SPI Setup
   uint8_t osrs_t = 1;             //Temperature oversampling x 1
   uint8_t osrs_p = 1;             //Pressure oversampling x 1
@@ -85,7 +83,7 @@ void setup(void) {
   writeReg(0xF2, ctrl_hum_reg);
   writeReg(0xF4, ctrl_meas_reg);
   writeReg(0xF5, config_reg);
-  readTrim();                    //
+  readTrim();
 
   //
   // Print preamble
