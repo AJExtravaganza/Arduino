@@ -105,6 +105,10 @@ void setup(void) {
   // improve reliability
   radio.setPayloadSize(8);
 
+  // Set the PA Level low to prevent power supply related issues since this is a
+  // getting_started sketch, and the likelihood of close proximity of the devices. RF24_PA_MAX is default.
+  radio.setPALevel(RF24_PA_LOW);
+
   //
   // Open pipes to other nodes for communication
   //
