@@ -1,9 +1,7 @@
 //// TO DO
-//// Work on a low-power mode such that radio is only active when necessary
 //// Work on implementing controls signal communication so that base station can drive outputs on the satellite
 //// Sanity check for erroneous values (temp/hum should not change more than 1-2deg at a time, and value in array should be limited to this range of change
 //// Remember to comment out debug for final deployment
-//// Why is it sending non-changed packets?  Investigate.
 
 
 #include <EEPROM.h>
@@ -21,10 +19,17 @@
 // Hardware configuration
 //
 
+const unsigned int SATELLITES = 2;
+bool liveDevices[SATELLITES] = {1,1};
+const long long unsigned int DEADMANPERIOD = 1000 * 60 * 60 * 24; // Check once per day
+long long unsigned int lastDeadmanCheck = 0; // Holds last time device status was checked
+
 const float TEMPHYS = 0.5;  // Hysteresis values
 const float HUMHYS = 0.5; 
+
 bool tempDelivered = false; //Only used for satellites.  Declared here for persistence over different loop() iterations
 bool humDelivered = false;  // Move these to one of the infinite internal loops at a later date
+
 
 // Set up nRF24L01 radio on SPI bus plus pins 9 & 10 
 RF24 radio(9, 10);
@@ -35,7 +40,7 @@ RF24 radio(9, 10);
 //
 
 // Radio pipe addresses for the 2 nodes to communicate.
-const uint64_t pipes[2] = {0xF0F0F0F0E1LL, 0xF0F0F0F0D2LL};
+const uint64_t pipes[6] = {0xF0F0F0F0D0LL, 0xF0F0F0F0D1LL, 0xF0F0F0F0D2LL, 0xF0F0F0F0D3LL, 0xF0F0F0F0D4LL, 0xF0F0F0F0D5LL};
 
 
 //
@@ -58,6 +63,27 @@ const char* role_friendly_name[] = {"invalid", "base", "satellite"};
 int deviceID = -1;
 role_e role = role_base;
 
+bool deadmanCheck(int deviceID) {
+  bool deviceResponded = false;
+  long long unsigned int startTime = millis();
+
+  radio.stopListening();
+  radio.openWritingPipe(pipes[deviceID]);
+  
+  while (!deviceResponded && millis() - startTime < 1000) { //Try for 1000ms
+    deviceResponded = radio.write(&deviceResponded,sizeof(deviceResponded)); //Send a ping and wait for it to be read by target radio
+  }
+  
+  liveDevices[deviceID] = deviceResponded; //Write status to array
+  radio.startListening();
+}
+
+void checkForLife(bool checkedIn[]) {
+  for (int i = 1; i <= SATELLITES; i++) {
+    deadmanCheck(i);
+  }
+  lastDeadmanCheck = millis();
+}
 
 void setup(void) {
   ////Load settings from EEPROM and assign role
@@ -123,12 +149,12 @@ void setup(void) {
   // Open the 'other' pipe for reading, in position #1 (we can have up to 5 pipes open for reading)
 
   if (role == role_base) {
-    radio.openWritingPipe(pipes[0]);
-    radio.openReadingPipe(1, pipes[1]);
+    //radio.openWritingPipe(pipes[0]);
+    radio.openReadingPipe(1, pipes[0]); //Changed to 0 from 1, since 1-5 are for base-to-sat transmits
   }
   else {
-    radio.openWritingPipe(pipes[1]);
-    radio.openReadingPipe(1, pipes[0]);
+    radio.openWritingPipe(pipes[0]); //Changed from 1 to match above
+    radio.openReadingPipe(1, pipes[deviceID]); //Changed from 0 to give per-device private recieve channel
   }
 
   //
@@ -228,6 +254,11 @@ void loop(void) {
   //
 
   if (role == role_base) {
+
+    if (millis() - lastDeadmanCheck > DEADMANPERIOD) {
+      checkForLife(liveDevices);
+      lastDeadmanCheck = millis();
+    }
     
     Transmission received(-1, 0.0,0.0);
 
