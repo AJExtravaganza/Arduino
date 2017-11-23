@@ -1,3 +1,7 @@
+#include <dht.h>
+
+
+
 //// TO DO
 //// Work on a low-power mode such that radio is only active when necessary
 //// Work on implementing controls signal communication so that base station can drive outputs on the satellite
@@ -16,13 +20,18 @@
 #include "Transmission.h"
 #include "BME280.h"
 
+//DHT STUFF FOR SHITTY TEST RIGS
+#define DHT11_PIN 2
+
+dht DHT;
+
 
 //
 // Hardware configuration
 //
 
-const float TEMPHYS = 0.5;  // Hysteresis values
-const float HUMHYS = 0.5; 
+const float TEMPHYS = 1.5;  // Hysteresis values
+const float HUMHYS = 1.5; 
 bool tempDelivered = false; //Only used for satellites.  Declared here for persistence over different loop() iterations
 bool humDelivered = false;  // Move these to one of the infinite internal loops at a later date
 
@@ -174,14 +183,13 @@ void loop(void) {
     while (role == role_satellite) {
 
       // Read the temp and humidity, and send two packets of type double whenever the change is sufficient.
-      readData();
+      //readData();
 
-      delay(5000);
-
-      temp_cal = calibration_T(temp_raw); //Get raw values from BME280
-      hum_cal = calibration_H(hum_raw);
-      temp_act = (double) temp_cal / 100.0; //Convert raw values to actual.  use round(value*10)/10(.0?) to get 1dp
-      hum_act = (double) hum_cal / 1024.0;
+      int chk = DHT.read11(DHT11_PIN);
+      if (chk == DHTLIB_OK) {
+        temp_act = double(DHT.temperature) - 1; //Quick and dirty calibration values
+        hum_act = double(DHT.humidity) + 5;
+      }
 
       printf("Just read temp=%i.%i, hum=%i.%i\n", int(temp_act), int(temp_act * 10) % 10, int(hum_act),
              int(hum_act * 10) % 10);
