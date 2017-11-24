@@ -22,6 +22,7 @@
 const unsigned int SATELLITES = 2;
 bool liveDevices[SATELLITES] = {1,1};
 const long long unsigned int DEADMANPERIOD = 5000;//1000 * 60 * 60 * 24; // Check once per day
+const long long unsigned int SATELLITEPOLLPERIOD = 2000; //Satellite poll rate
 long long unsigned int lastDeadmanCheck = 0; // Holds last time device status was checked
 
 const float TEMPHYS = 0.5;  // Hysteresis values
@@ -39,7 +40,7 @@ RF24 radio(9, 10);
 // Topology
 //
 
-// Radio pipe addresses for the 2 nodes to communicate.
+// Radio pipe addresses for 6 nodes to communicate.
 const uint64_t pipes[6] = {0xF0F0F0F0D0LL, 0xF0F0F0F0D1LL, 0xF0F0F0F0D2LL, 0xF0F0F0F0D3LL, 0xF0F0F0F0D4LL, 0xF0F0F0F0D5LL};
 
 
@@ -113,10 +114,6 @@ void setup(void) {
   writeReg(0xF5, config_reg);
   readTrim();
 
-  //
-  // Print preamble
-  //
-
   printf_begin();
   printf("ROLE: %s with ID %i\n\r", role_friendly_name[role], settings.deviceID);
 
@@ -134,9 +131,8 @@ void setup(void) {
   radio.setPayloadSize(8);
 
   radio.setDataRate(RF24_250KBPS);
-
-  // Set the PA Level low to prevent power supply related issues since this is a
-  // getting_started sketch, and the likelihood of close proximity of the devices. RF24_PA_MAX is default.
+  
+  // Set radio amplification level
   radio.setPALevel(RF24_PA_MAX);
 
   //
@@ -157,23 +153,16 @@ void setup(void) {
     radio.openReadingPipe(1, pipes[deviceID]); //Changed from 0 to give per-device private recieve channel
   }
 
-  //
-  // Start listening
-  //
-
   radio.startListening();
-
-  //
-  // Dump the configuration of the rf unit for debugging
-  //
-
+  
   radio.printDetails();
 }
 
 
 void loop(void) {
   
-  if (role == role_satellite) {
+  if (role == role_satellite) {  //Satellite setup
+    long long unsigned int lastSatellitePoll = 0;
     double temp_act = 0.0, hum_act = 0.0;
     signed long int temp_cal;
     unsigned long int hum_cal;
@@ -184,64 +173,56 @@ void loop(void) {
     temp_cal = calibration_T(temp_raw);
     hum_cal = calibration_H(hum_raw);
 
-    //double initTemp = (double) temp_cal / 100.0;
-    //double initHum = (double) hum_cal / 1024.0;
-
-
-    //double prev_temp_act = 0;
-    //double prev_hum_act = 0;
-
     double del_temp_act = 0;
     double del_hum_act = 0;
 
-    //printf("Init with T=%i.%i, H=%i.%i\n", int(initTemp), int(initTemp * 10) % 10, int(initHum),
-   //        int(initHum * 10) % 10);
-
-    while (role == role_satellite) {
-
-      // Read the temp and humidity, and send two packets of type double whenever the change is sufficient.
-      readData();
-
-      delay(5000); //Not actually sure why this is here.  Test removal when commission.
-
-      temp_cal = calibration_T(temp_raw); //Get raw values from BME280
-      hum_cal = calibration_H(hum_raw);
-      temp_act = (double) temp_cal / 100.0; //Convert raw values to actual.  use round(value*10)/10(.0?) to get 1dp
-      hum_act = (double) hum_cal / 1024.0;
-
-      printf("Just read temp=%i.%i, hum=%i.%i\n", int(temp_act), int(temp_act * 10) % 10, int(hum_act),
-             int(hum_act * 10) % 10);
-
-      Transmission latest(deviceID, temp_act, hum_act);
-      
-      if (latest.changed(prevPayload, TEMPHYS, HUMHYS)) {
-        bool delivered = false;
-        
-        radio.stopListening();
-
-        while (!delivered) {
-
-          printf("Now sending ");
-          latest.printCSV();
-          
-          delivered = radio.write(&latest, sizeof(latest));
-
-          if (delivered) {
-            printf("ok...\n");
-          }
-          else {
-            printf("failed.\n\r");
-          }
-        }
-        prevPayload = latest;
-
-        //radio.write(0,0); // This can fix a failed subsequent xmit if radio.available isn't called on read.
-
-      // Continue listening
-      radio.startListening();
+    while (role == role_satellite) { //Satellite main loop
+      if (radio.available()) {
+        bool basePing = radio.read(&basePing, sizeof(basePing));
       }
-      // Try again 30s later
-      delay(1000); // Loop poll rate.  Adjust sensor poll rate later to match to reduce power consumption.
+      if (millis() - lastSatellitePoll > SATELLITEPOLLPERIOD) {
+        lastSatellitePoll = millis();
+        
+        // Read the temp and humidity, and send two packets of type double whenever the change is sufficient.
+        readData();
+  
+        temp_cal = calibration_T(temp_raw); //Get raw values from BME280
+        hum_cal = calibration_H(hum_raw);
+        temp_act = (double) temp_cal / 100.0; //Convert raw values to actual.  use round(value*10)/10(.0?) to get 1dp
+        hum_act = (double) hum_cal / 1024.0;
+  
+        printf("Just read temp=%i.%i, hum=%i.%i\n", int(temp_act), int(temp_act * 10) % 10, int(hum_act),
+               int(hum_act * 10) % 10);
+  
+        Transmission latest(deviceID, temp_act, hum_act);
+        
+        if (latest.changed(prevPayload, TEMPHYS, HUMHYS)) {
+          bool delivered = false;
+          
+          radio.stopListening();
+  
+          while (!delivered) {
+  
+            printf("Now sending ");
+            latest.printCSV();
+            
+            delivered = radio.write(&latest, sizeof(latest));
+  
+            if (delivered) {
+              printf("ok...\n");
+            }
+            else {
+              printf("failed.\n\r");
+            }
+          }
+          prevPayload = latest;
+  
+        // Continue listening
+        radio.startListening();
+        }
+        // Try again 30s later
+        delay(1000); // Loop poll rate.  Adjust sensor poll rate later to match to reduce power consumption.
+      }
     }
   }
 
