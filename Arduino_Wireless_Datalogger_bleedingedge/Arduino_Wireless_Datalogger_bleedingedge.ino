@@ -21,7 +21,7 @@
 
 const unsigned int SATELLITES = 2;
 bool liveDevices[SATELLITES] = {1,1};
-const long long unsigned int DEADMANPERIOD = 1000 * 60 * 60 * 24; // Check once per day
+const long long unsigned int DEADMANPERIOD = 5000;//1000 * 60 * 60 * 24; // Check once per day
 long long unsigned int lastDeadmanCheck = 0; // Holds last time device status was checked
 
 const float TEMPHYS = 0.5;  // Hysteresis values
@@ -202,7 +202,7 @@ void loop(void) {
       // Read the temp and humidity, and send two packets of type double whenever the change is sufficient.
       readData();
 
-      delay(5000);
+      delay(5000); //Not actually sure why this is here.  Test removal when commission.
 
       temp_cal = calibration_T(temp_raw); //Get raw values from BME280
       hum_cal = calibration_H(hum_raw);
@@ -256,8 +256,20 @@ void loop(void) {
   if (role == role_base) {
 
     if (millis() - lastDeadmanCheck > DEADMANPERIOD) {
+      printf("%lu: Checking for life (last checked at %lu)\n", (millis() / 1000)), (long long unsigned int)(lastDeadmanCheck / 1000); // Timestamp (seconds since base start)
+      
       checkForLife(liveDevices);
       lastDeadmanCheck = millis();
+
+      for (int i = 0; i <= SATELLITES; i++) {
+        printf("Device %i ", i);
+        if (liveDevices[i]) {
+          printf("Live\n");
+        }
+        else {
+          printf("Non-responsive\n");
+        }
+      }
     }
     
     Transmission received(-1, 0.0,0.0);
