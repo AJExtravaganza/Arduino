@@ -1,7 +1,13 @@
+#include <dht.h>
+
+
+
 //// TO DO
+//// Work on a low-power mode such that radio is only active when necessary
 //// Work on implementing controls signal communication so that base station can drive outputs on the satellite
 //// Sanity check for erroneous values (temp/hum should not change more than 1-2deg at a time, and value in array should be limited to this range of change
 //// Remember to comment out debug for final deployment
+//// Why is it sending non-changed packets?  Investigate.
 
 
 #include <EEPROM.h>
@@ -14,6 +20,11 @@
 #include "Transmission.h"
 #include "BME280.h"
 
+//DHT STUFF FOR SHITTY TEST RIGS
+#define DHT11_PIN 2
+
+dht DHT;
+
 
 //
 // Hardware configuration
@@ -21,7 +32,7 @@
 
 const unsigned int SATELLITES = 2;
 bool liveDevices[SATELLITES] = {1,1};
-const long long unsigned int DEADMANPERIOD = 5000;//1000 * 60 * 60 * 24; // Check once per day
+const long long unsigned int DEADMANPERIOD = 1000 * 60 * 60 * 24; // Check once per day
 long long unsigned int lastDeadmanCheck = 0; // Holds last time device status was checked
 
 const float TEMPHYS = 0.5;  // Hysteresis values
@@ -29,7 +40,6 @@ const float HUMHYS = 0.5;
 
 bool tempDelivered = false; //Only used for satellites.  Declared here for persistence over different loop() iterations
 bool humDelivered = false;  // Move these to one of the infinite internal loops at a later date
-
 
 // Set up nRF24L01 radio on SPI bus plus pins 9 & 10 
 RF24 radio(9, 10);
@@ -55,14 +65,6 @@ typedef enum {
   role_base = 1, role_satellite
 } role_e;
 
-// The debug-friendly names of those roles
-const char* role_friendly_name[] = {"invalid", "base", "satellite"};
-
-
-// Declare role and ID
-int deviceID = -1;
-role_e role = role_base;
-
 bool deadmanCheck(int deviceID) {
   bool deviceResponded = false;
   long long unsigned int startTime = millis();
@@ -84,6 +86,15 @@ void checkForLife(bool checkedIn[]) {
   }
   lastDeadmanCheck = millis();
 }
+
+// The debug-friendly names of those roles
+const char* role_friendly_name[] = {"invalid", "base", "satellite"};
+
+
+// Declare role and ID
+int deviceID = -1;
+role_e role = role_base;
+
 
 void setup(void) {
   ////Load settings from EEPROM and assign role
@@ -149,12 +160,12 @@ void setup(void) {
   // Open the 'other' pipe for reading, in position #1 (we can have up to 5 pipes open for reading)
 
   if (role == role_base) {
-    //radio.openWritingPipe(pipes[0]);
-    radio.openReadingPipe(1, pipes[0]); //Changed to 0 from 1, since 1-5 are for base-to-sat transmits
+    radio.openWritingPipe(pipes[0]);
+    radio.openReadingPipe(1, pipes[1]);
   }
   else {
-    radio.openWritingPipe(pipes[0]); //Changed from 1 to match above
-    radio.openReadingPipe(1, pipes[deviceID]); //Changed from 0 to give per-device private recieve channel
+    radio.openWritingPipe(pipes[1]);
+    radio.openReadingPipe(1, pipes[0]);
   }
 
   //
@@ -200,14 +211,13 @@ void loop(void) {
     while (role == role_satellite) {
 
       // Read the temp and humidity, and send two packets of type double whenever the change is sufficient.
-      readData();
+      //readData();
 
-      delay(5000); //Not actually sure why this is here.  Test removal when commission.
-
-      temp_cal = calibration_T(temp_raw); //Get raw values from BME280
-      hum_cal = calibration_H(hum_raw);
-      temp_act = (double) temp_cal / 100.0; //Convert raw values to actual.  use round(value*10)/10(.0?) to get 1dp
-      hum_act = (double) hum_cal / 1024.0;
+      int chk = DHT.read11(DHT11_PIN);
+      if (chk == DHTLIB_OK) {
+        temp_act = double(DHT.temperature) - 1; //Quick and dirty calibration values
+        hum_act = double(DHT.humidity) + 5;
+      }
 
       printf("Just read temp=%i.%i, hum=%i.%i\n", int(temp_act), int(temp_act * 10) % 10, int(hum_act),
              int(hum_act * 10) % 10);
@@ -254,23 +264,6 @@ void loop(void) {
   //
 
   if (role == role_base) {
-
-    if (millis() - lastDeadmanCheck > DEADMANPERIOD) {
-      printf("%lu: Checking for life (last checked at %lu)\n", (millis() / 1000)), (long long unsigned int)(lastDeadmanCheck / 1000); // Timestamp (seconds since base start)
-      
-      checkForLife(liveDevices);
-      lastDeadmanCheck = millis();
-
-      for (int i = 0; i <= SATELLITES; i++) {
-        printf("Device %i ", i);
-        if (liveDevices[i]) {
-          printf("Live\n");
-        }
-        else {
-          printf("Non-responsive\n");
-        }
-      }
-    }
     
     Transmission received(-1, 0.0,0.0);
 
