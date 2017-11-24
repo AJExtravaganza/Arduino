@@ -21,7 +21,7 @@
 
 const unsigned int SATELLITES = 2;
 bool liveDevices[SATELLITES] = {1,1};
-const long long unsigned int DEADMANPERIOD = 5000;//1000 * 60 * 60 * 24; // Check once per day
+const long long unsigned int DEADMANPERIOD = 1000 * 60 * 60;//1000 * 60 * 60 * 24; // Check once per day
 long long unsigned int lastDeadmanCheck = 0; // Holds last time device status was checked
 
 const float TEMPHYS = 0.5;  // Hysteresis values
