@@ -32,11 +32,12 @@ dht DHT;
 
 const unsigned int SATELLITES = 2;
 bool liveDevices[SATELLITES] = {1,1};
-const long long unsigned int DEADMANPERIOD = 1000 * 60 * 60 * 24; // Check once per day
+const long long unsigned int DEADMANPERIOD = 5000;//1000 * 60 * 60 * 24; // Check once per day
+const long long unsigned int SATELLITEPOLLPERIOD = 1000; //Satellite poll rate
 long long unsigned int lastDeadmanCheck = 0; // Holds last time device status was checked
 
-const float TEMPHYS = 0.5;  // Hysteresis values
-const float HUMHYS = 0.5; 
+const float TEMPHYS = 1.5;  // Hysteresis values
+const float HUMHYS = 1.5; 
 
 bool tempDelivered = false; //Only used for satellites.  Declared here for persistence over different loop() iterations
 bool humDelivered = false;  // Move these to one of the infinite internal loops at a later date
@@ -160,12 +161,11 @@ void setup(void) {
   // Open the 'other' pipe for reading, in position #1 (we can have up to 5 pipes open for reading)
 
   if (role == role_base) {
-    radio.openWritingPipe(pipes[0]);
-    radio.openReadingPipe(1, pipes[1]);
+    radio.openReadingPipe(1, pipes[0]); //Open channel to receive comms from all satellites
   }
   else {
-    radio.openWritingPipe(pipes[1]);
-    radio.openReadingPipe(1, pipes[0]);
+    radio.openWritingPipe(pipes[0]); //All satellites send data to base on channel 0
+    radio.openReadingPipe(1, pipes[deviceID]); //Each satellite listens for commands on its matching channel
   }
 
   //
@@ -185,6 +185,7 @@ void setup(void) {
 void loop(void) {
   
   if (role == role_satellite) {
+    long long unsigned int lastSatellitePoll = 0;
     double temp_act = 0.0, hum_act = 0.0;
     signed long int temp_cal;
     unsigned long int hum_cal;
@@ -210,48 +211,54 @@ void loop(void) {
 
     while (role == role_satellite) {
 
-      // Read the temp and humidity, and send two packets of type double whenever the change is sufficient.
-      //readData();
-
-      int chk = DHT.read11(DHT11_PIN);
-      if (chk == DHTLIB_OK) {
-        temp_act = double(DHT.temperature) - 1; //Quick and dirty calibration values
-        hum_act = double(DHT.humidity) + 5;
+      if (radio.available()) {
+        bool basePing = radio.read(&basePing, sizeof(basePing));
       }
-
-      printf("Just read temp=%i.%i, hum=%i.%i\n", int(temp_act), int(temp_act * 10) % 10, int(hum_act),
-             int(hum_act * 10) % 10);
-
-      Transmission latest(deviceID, temp_act, hum_act);
       
-      if (latest.changed(prevPayload, TEMPHYS, HUMHYS)) {
-        bool delivered = false;
-        
-        radio.stopListening();
-
-        while (!delivered) {
-
-          printf("Now sending ");
-          latest.printCSV();
-          
-          delivered = radio.write(&latest, sizeof(latest));
-
-          if (delivered) {
-            printf("ok...\n");
-          }
-          else {
-            printf("failed.\n\r");
-          }
+      if (millis() - lastSatellitePoll > SATELLITEPOLLPERIOD) {
+        // Read the temp and humidity, and send two packets of type double whenever the change is sufficient.
+        //readData();
+  
+        int chk = DHT.read11(DHT11_PIN);
+        if (chk == DHTLIB_OK) {
+          temp_act = double(DHT.temperature) - 1; //Quick and dirty calibration values
+          hum_act = double(DHT.humidity) + 5;
         }
-        prevPayload = latest;
-
-        //radio.write(0,0); // This can fix a failed subsequent xmit if radio.available isn't called on read.
-
-      // Continue listening
-      radio.startListening();
+  
+        printf("Just read temp=%i.%i, hum=%i.%i\n", int(temp_act), int(temp_act * 10) % 10, int(hum_act),
+               int(hum_act * 10) % 10);
+  
+        Transmission latest(deviceID, temp_act, hum_act);
+        
+        if (latest.changed(prevPayload, TEMPHYS, HUMHYS)) {
+          bool delivered = false;
+          
+          radio.stopListening();
+  
+          while (!delivered) {
+  
+            printf("Now sending ");
+            latest.printCSV();
+            
+            delivered = radio.write(&latest, sizeof(latest));
+  
+            if (delivered) {
+              printf("ok...\n");
+            }
+            else {
+              printf("failed.\n\r");
+            }
+          }
+          prevPayload = latest;
+  
+          //radio.write(0,0); // This can fix a failed subsequent xmit if radio.available isn't called on read.
+  
+        // Continue listening
+        radio.startListening();
+        }
+        // Try again 30s later
+        delay(1000); // Loop poll rate.  Adjust sensor poll rate later to match to reduce power consumption.
       }
-      // Try again 30s later
-      delay(1000); // Loop poll rate.  Adjust sensor poll rate later to match to reduce power consumption.
     }
   }
 

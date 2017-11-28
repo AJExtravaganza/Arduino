@@ -21,8 +21,8 @@
 
 const unsigned int SATELLITES = 2;
 bool liveDevices[SATELLITES] = {1,1};
-const long long unsigned int DEADMANPERIOD = 5000;//1000 * 60 * 60 * 24; // Check once per day
-const long long unsigned int SATELLITEPOLLPERIOD = 2000; //Satellite poll rate
+const long long unsigned int DEADMANPERIOD = 1000 * 5;//60 * 60 * 24; // Check once per day
+const long long unsigned int SATELLITEPOLLPERIOD = 1000;// * 60 * 15; //Satellite poll rate
 long long unsigned int lastDeadmanCheck = 0; // Holds last time device status was checked
 
 const float TEMPHYS = 0.5;  // Hysteresis values
@@ -145,17 +145,16 @@ void setup(void) {
   // Open the 'other' pipe for reading, in position #1 (we can have up to 5 pipes open for reading)
 
   if (role == role_base) {
-    //radio.openWritingPipe(pipes[0]);
-    radio.openReadingPipe(1, pipes[0]); //Changed to 0 from 1, since 1-5 are for base-to-sat transmits
+    radio.openReadingPipe(1, pipes[0]); //Open channel to receive comms from all satellites
   }
   else {
-    radio.openWritingPipe(pipes[0]); //Changed from 1 to match above
-    radio.openReadingPipe(1, pipes[deviceID]); //Changed from 0 to give per-device private recieve channel
+    radio.openWritingPipe(pipes[0]); //All satellites send data to base on channel 0
+    radio.openReadingPipe(1, pipes[deviceID]); //Each satellite listens for commands on its matching channel
   }
 
   radio.startListening();
   
-  radio.printDetails();
+  radio.printDetails(); //Outputs detailed information on radio unit and settings
 }
 
 
@@ -173,14 +172,16 @@ void loop(void) {
     temp_cal = calibration_T(temp_raw);
     hum_cal = calibration_H(hum_raw);
 
-    double del_temp_act = 0;
-    double del_hum_act = 0;
+    double del_temp_act = 0; //Change in temperature since last transmission
+    double del_hum_act = 0; //Change in humidity since last transmission
 
     while (role == role_satellite) { //Satellite main loop
-      if (radio.available()) {
-        bool basePing = radio.read(&basePing, sizeof(basePing));
+      
+      if (radio.available()) { //If base is checking for life-sign
+        bool basePing = radio.read(&basePing, sizeof(basePing)); //Accept the ping
       }
-      if (millis() - lastSatellitePoll > SATELLITEPOLLPERIOD) {
+      
+      if (millis() - lastSatellitePoll > SATELLITEPOLLPERIOD) { //If it's time to poll the sensors again
         lastSatellitePoll = millis();
         
         // Read the temp and humidity, and send two packets of type double whenever the change is sufficient.
@@ -194,19 +195,19 @@ void loop(void) {
         printf("Just read temp=%i.%i, hum=%i.%i\n", int(temp_act), int(temp_act * 10) % 10, int(hum_act),
                int(hum_act * 10) % 10);
   
-        Transmission latest(deviceID, temp_act, hum_act);
+        Transmission latest(deviceID, temp_act, hum_act); //Create new transmission
         
-        if (latest.changed(prevPayload, TEMPHYS, HUMHYS)) {
+        if (latest.changed(prevPayload, TEMPHYS, HUMHYS)) { //If new values are sufficiently different
           bool delivered = false;
           
-          radio.stopListening();
+          radio.stopListening(); //Pause listening to enable transmitting
   
           while (!delivered) {
   
             printf("Now sending ");
-            latest.printCSV();
+            latest.printCSV(); //A summary of the transmission being sent.
             
-            delivered = radio.write(&latest, sizeof(latest));
+            delivered = radio.write(&latest, sizeof(latest)); //Assigns true if transmission is successfully received by base
   
             if (delivered) {
               printf("ok...\n");
@@ -221,6 +222,8 @@ void loop(void) {
         radio.startListening();
         }
         // Try again 30s later
+        
+        //fixme Remove and test
         delay(1000); // Loop poll rate.  Adjust sensor poll rate later to match to reduce power consumption.
       }
     }
@@ -236,13 +239,13 @@ void loop(void) {
 
   if (role == role_base) {
 
-    if (millis() - lastDeadmanCheck > DEADMANPERIOD) {
+    if (millis() - lastDeadmanCheck > DEADMANPERIOD) { // If it's time to check for satellite lifesigns
       printf("%lu: Checking for life (last checked at %lu)\n", (millis() / 1000)), (long long unsigned int)(lastDeadmanCheck / 1000); // Timestamp (seconds since base start)
       
       checkForLife(liveDevices);
       lastDeadmanCheck = millis();
 
-      for (int i = 0; i <= SATELLITES; i++) {
+      for (int i = 0; i <= SATELLITES; i++) { //output summary of life-sign check
         printf("Device %i ", i);
         if (liveDevices[i]) {
           printf("Live\n");
@@ -255,13 +258,13 @@ void loop(void) {
     
     Transmission received(-1, 0.0,0.0);
 
-    if (radio.available()) {
+    if (radio.available()) { //If a transmission has been sent from a satellite
       
-      radio.read(&received, sizeof(received));
+      radio.read(&received, sizeof(received)); //Read it
 
-      printf("%i;", received.xmitterID);
-      printf("%lu;", (millis() / 1000)); // Timestamp (seconds since base start)
-      received.printCSV();
+      printf("%i;", received.xmitterID); //Output CSV with ID,
+      printf("%lu;", (millis() / 1000)); // timestamp (seconds since base start)
+      received.printCSV(); //And values
       
       }
       
