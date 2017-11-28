@@ -21,9 +21,9 @@
 
 const unsigned int SATELLITES = 2;
 bool liveDevices[SATELLITES] = {1,1};
-const long long unsigned int DEADMANPERIOD = 1000 * 5;//60 * 60 * 24; // Check once per day
-const long long unsigned int SATELLITEPOLLPERIOD = 1000;// * 60 * 15; //Satellite poll rate
-long long unsigned int lastDeadmanCheck = 0; // Holds last time device status was checked
+const unsigned long int DEADMANPERIOD = 1000UL * 60UL * 60UL;// * 24UL; // Check once per day
+const unsigned long int SATELLITEPOLLPERIOD = 1000UL;// * 60UL * 15UL; //Satellite poll rate
+unsigned long int lastDeadmanCheck = 0; // Holds last time device status was checked
 
 const float TEMPHYS = 0.5;  // Hysteresis values
 const float HUMHYS = 0.5; 
@@ -85,6 +85,16 @@ void checkForLife(bool checkedIn[]) {
   }
   lastDeadmanCheck = millis();
 }
+
+
+/* TROUBLE INCLUDING STRING LIBRARY FILE FOR SOME REASON
+ 
+string millisAsHHMM(unsigned long int milliseconds) {
+  string hhmm = std::to_string(milliseconds/1000/60) + "m" + std::to_string(milliseconds/1000%60) + "s";
+  return hhmm
+}
+
+*/
 
 void setup(void) {
   ////Load settings from EEPROM and assign role
@@ -238,22 +248,23 @@ void loop(void) {
   //
 
   if (role == role_base) {
-
-    if (millis() - lastDeadmanCheck > DEADMANPERIOD) { // If it's time to check for satellite lifesigns
-      printf("%lu: Checking for life (last checked at %lu)\n", (millis() / 1000)), (long long unsigned int)(lastDeadmanCheck / 1000); // Timestamp (seconds since base start)
+   
+    if (static_cast<unsigned long int>(millis() - lastDeadmanCheck) > static_cast<unsigned long int>(DEADMANPERIOD)) { // If it's time to check for satellite lifesigns
+      //printf("%lu: Checking for life (last checked at %lu)\n", (millis() / 1000), lastDeadmanCheck/1000); // Timestamp (seconds since base start)
       
       checkForLife(liveDevices);
-      lastDeadmanCheck = millis();
-
-      for (int i = 0; i <= SATELLITES; i++) { //output summary of life-sign check
-        printf("Device %i ", i);
+      lastDeadmanCheck = static_cast<unsigned long int>(millis());
+      
+      for (int i = 1; i <= SATELLITES; i++) { //output summary of life-sign check
+        printf("SAT1: %i ", i);
         if (liveDevices[i]) {
-          printf("Live\n");
+          printf("LIVE   ");
         }
         else {
-          printf("Non-responsive\n");
+          printf("DEAD   ");
         }
       }
+      printf("\n");
     }
     
     Transmission received(-1, 0.0,0.0);
