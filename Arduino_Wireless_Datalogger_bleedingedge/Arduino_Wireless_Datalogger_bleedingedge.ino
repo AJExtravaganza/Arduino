@@ -19,11 +19,13 @@
 // Hardware configuration
 //
 
-const unsigned int SATELLITES = 2;
-bool liveDevices[SATELLITES] = {1,1};
-const unsigned long int DEADMANPERIOD = 1000UL * 60UL * 60UL;// * 24UL; // Check once per day
+const unsigned int SATELLITES = 1;
+const unsigned long int DEADMANPERIOD = 1000UL * 30UL;//60UL * 60UL;// * 24UL; // Check once per day
+const unsigned long int SATELLITELOOPPERIOD = 1000UL; // Must be <95% of DEADMANPERIOD
 const unsigned long int SATELLITEPOLLPERIOD = 1000UL;// * 60UL * 15UL; //Satellite poll rate
-unsigned long int lastDeadmanCheck = 0; // Holds last time device status was checked
+bool liveDevices[SATELLITES + 1]; //Index corresponds with device ID
+unsigned long int satelliteLastTransmissionTime[SATELLITES]; //Index corresponds with device ID
+unsigned long int lastCheckedIn = 0; // Holds last time satellite contacted base (by successfully sending a transmission)
 
 const float TEMPHYS = 0.5;  // Hysteresis values
 const float HUMHYS = 0.5; 
@@ -64,39 +66,33 @@ const char* role_friendly_name[] = {"invalid", "base", "satellite"};
 int deviceID = -1;
 role_e role = role_base;
 
-bool deadmanCheck(int deviceID) {
-  bool deviceResponded = false;
-  long long unsigned int startTime = millis();
-
-  radio.stopListening();
-  radio.openWritingPipe(pipes[deviceID]);
-  
-  while (!deviceResponded && millis() - startTime < 1000) { //Try for 1000ms
-    deviceResponded = radio.write(&deviceResponded,sizeof(deviceResponded)); //Send a ping and wait for it to be read by target radio
-  }
-  
-  liveDevices[deviceID] = deviceResponded; //Write status to array
-  radio.startListening();
+bool deviceFailure() {
+	bool deviceFailed = false;
+	
+	for (int i = 1; i <= SATELLITES; i++) {
+		//printf("Device %i ", i);
+		
+		if (static_cast<unsigned long int>(millis() -satelliteLastTransmissionTime[i]) > DEADMANPERIOD) {
+			liveDevices[i] = false;
+			//printf("DOWN. ");
+			deviceFailed = true;
+		}
+		else {
+			liveDevices[i] = true;
+			//printf("UP. ");
+		}
+		//printf("\n");
+	}
+	
+	return deviceFailed;
 }
-
-void checkForLife(bool checkedIn[]) {
-  for (int i = 1; i <= SATELLITES; i++) {
-    deadmanCheck(i);
-  }
-  lastDeadmanCheck = millis();
-}
-
-
-/* TROUBLE INCLUDING STRING LIBRARY FILE FOR SOME REASON
- 
-string millisAsHHMM(unsigned long int milliseconds) {
-  string hhmm = std::to_string(milliseconds/1000/60) + "m" + std::to_string(milliseconds/1000%60) + "s";
-  return hhmm
-}
-
-*/
 
 void setup(void) {
+for (int i = 0; i <= SATELLITES; i++) { //Initialise deadman arrays
+  liveDevices[i] = 0;
+  satelliteLastTransmissionTime[i] = 0;
+}
+  
   ////Load settings from EEPROM and assign role
   DeviceSettings settings;
   settings.read();
@@ -163,7 +159,8 @@ void setup(void) {
   }
 
   radio.startListening();
-  
+
+  //Commented out for Qt QString compatibility, which can't handle tabs in QString.left()
   radio.printDetails(); //Outputs detailed information on radio unit and settings
 }
 
@@ -207,7 +204,8 @@ void loop(void) {
   
         Transmission latest(deviceID, temp_act, hum_act); //Create new transmission
         
-        if (latest.changed(prevPayload, TEMPHYS, HUMHYS)) { //If new values are sufficiently different
+        if (latest.changed(prevPayload, TEMPHYS, HUMHYS) //If new values are sufficiently different
+			      || (static_cast<unsigned long int>(millis() - lastCheckedIn) > static_cast<unsigned long int>(DEADMANPERIOD * 95UL / 100UL))) { // or it's time to check in with base
           bool delivered = false;
           
           radio.stopListening(); //Pause listening to enable transmitting
@@ -215,26 +213,26 @@ void loop(void) {
           while (!delivered) {
   
             printf("Now sending ");
-            latest.printCSV(); //A summary of the transmission being sent.
+            latest.printCSV(); //Print a summary of the transmission being sent.
             
             delivered = radio.write(&latest, sizeof(latest)); //Assigns true if transmission is successfully received by base
   
             if (delivered) {
               printf("ok...\n");
+			  lastCheckedIn = millis(); //Update record of last check-in with base
             }
             else {
               printf("failed.\n\r");
             }
           }
-          prevPayload = latest;
+          prevPayload = latest; //Update record of last transmission successfully sent
   
         // Continue listening
         radio.startListening();
         }
-        // Try again 30s later
         
         //fixme Remove and test
-        delay(1000); // Loop poll rate.  Adjust sensor poll rate later to match to reduce power consumption.
+        delay(SATELLITELOOPPERIOD); // Loop poll rate.  Adjust sensor poll rate later to match to reduce power consumption.
       }
     }
   }
@@ -249,33 +247,23 @@ void loop(void) {
 
   if (role == role_base) {
    
-    if (static_cast<unsigned long int>(millis() - lastDeadmanCheck) > static_cast<unsigned long int>(DEADMANPERIOD)) { // If it's time to check for satellite lifesigns
-      //printf("%lu: Checking for life (last checked at %lu)\n", (millis() / 1000), lastDeadmanCheck/1000); // Timestamp (seconds since base start)
-      
-      checkForLife(liveDevices);
-      lastDeadmanCheck = static_cast<unsigned long int>(millis());
-      
-      for (int i = 1; i <= SATELLITES; i++) { //output summary of life-sign check
-        printf("SAT1: %i ", i);
-        if (liveDevices[i]) {
-          printf("LIVE   ");
-        }
-        else {
-          printf("DEAD   ");
-        }
-      }
-      printf("\n");
-    }
+   Transmission received(-1, 0.0,0.0);
+   
+	if (deviceFailure()) { //Check for devices that haven't touched base recently.  If such exists,
+		//Do an alarm thingy
+		//printf("DEVICE FAIL ALARM PLACEHOLDER\n");
+	}
     
-    Transmission received(-1, 0.0,0.0);
+    
 
-    if (radio.available()) { //If a transmission has been sent from a satellite
+    if (radio.available()) { //If a satellite transmission is pending
       
       radio.read(&received, sizeof(received)); //Read it
 
       printf("%i;", received.xmitterID); //Output CSV with ID,
       printf("%lu;", (millis() / 1000)); // timestamp (seconds since base start)
       received.printCSV(); //And values
+	  satelliteLastTransmissionTime[received.xmitterID] = millis();
       
       }
       
