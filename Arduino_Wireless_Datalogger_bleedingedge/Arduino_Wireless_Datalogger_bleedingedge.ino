@@ -19,10 +19,13 @@
 // Hardware configuration
 //
 
+
+bool tempFailureBool = false; //debug variable for device failure
+
 const unsigned int SATELLITES = 1;
-const unsigned long int DEADMANPERIOD = 1000UL * 30UL;//60UL * 60UL;// * 24UL; // Check once per day
-const unsigned long int SATELLITELOOPPERIOD = 1000UL; // Must be <95% of DEADMANPERIOD
-const unsigned long int SATELLITEPOLLPERIOD = 1000UL;// * 60UL * 15UL; //Satellite poll rate
+const unsigned long int DEADMANPERIOD = 1000UL * 60UL * 60UL;// * 24UL; // Check once per hour
+const unsigned long int SATELLITELOOPPERIOD = 1000UL * 60UL * 5UL; // Must be <95% of DEADMANPERIOD and <=SATELLITEPOLLPERIOD (5min)
+const unsigned long int SATELLITEPOLLPERIOD = 1000UL * 60UL * 15UL; //Satellite poll rate (15min)
 bool liveDevices[SATELLITES + 1]; //Index corresponds with device ID
 unsigned long int satelliteLastTransmissionTime[SATELLITES]; //Index corresponds with device ID
 unsigned long int lastCheckedIn = 0; // Holds last time satellite contacted base (by successfully sending a transmission)
@@ -251,8 +254,18 @@ void loop(void) {
    
 	if (deviceFailure()) { //Check for devices that haven't touched base recently.  If such exists,
 		//Do an alarm thingy
-		//printf("DEVICE FAIL ALARM PLACEHOLDER\n");
+    /*
+		if (!tempFailureBool) {
+    printf("DEVICE DOWN at %lu\n", (millis() / 1000));
+    tempFailureBool = true;
+		}
 	}
+ else {
+  if (tempFailureBool) {
+    printf("DEVICE UP at %lu\n", (millis() / 1000));
+    tempFailureBool = false;
+  }*/
+ }
     
     
 
