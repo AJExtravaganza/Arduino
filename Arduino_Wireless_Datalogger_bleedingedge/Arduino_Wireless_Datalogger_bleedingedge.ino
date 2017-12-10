@@ -20,22 +20,19 @@
 //
 
 
-bool tempFailureBool = false; //debug variable for device failure
+//When set to false, this seems to initialise every loop, which is concerning
+bool deviceWasDown = true; //debug variable for device failure
 
 const unsigned int SATELLITES = 1;
-const unsigned long int DEADMANPERIOD = 1000UL * 60UL * 60UL;// * 24UL; // Check once per hour
-const unsigned long int SATELLITELOOPPERIOD = 1000UL * 60UL * 1UL; // Must be <95% of DEADMANPERIOD and <=SATELLITEPOLLPERIOD (1min)
-const unsigned long int SATELLITEPOLLPERIOD = 1000UL * 60UL * 5UL; //Satellite poll rate (5min)
+const unsigned long int DEADMANPERIOD = 1000UL * 60UL * 15UL; // Check in once every fifteen minutes
+const unsigned long int SATELLITELOOPPERIOD = DEADMANPERIOD / 15UL; // Must be <50% of DEADMANPERIOD and <=SATELLITEPOLLPERIOD
+const unsigned long int SATELLITEPOLLPERIOD = DEADMANPERIOD / 10UL; //Satellite poll rate (5sec for debugging)
 bool liveDevices[SATELLITES + 1]; //Index corresponds with device ID
 unsigned long int satelliteLastTransmissionTime[SATELLITES]; //Index corresponds with device ID
 unsigned long int lastCheckedIn = 0; // Holds last time satellite contacted base (by successfully sending a transmission)  Used by sats only.
 
 const float TEMPHYS = 0.5;  // Hysteresis values
 const float HUMHYS = 0.5; 
-
-bool tempDelivered = false; //Only used for satellites.  Declared here for persistence over different loop() iterations
-bool humDelivered = false;  // Move these to one of the infinite internal loops at a later date
-
 
 // Set up nRF24L01 radio on SPI bus plus pins 9 & 10 
 RF24 radio(9, 10);
@@ -91,10 +88,10 @@ bool deviceFailure() {
 }
 
 void setup(void) {
-for (int i = 0; i <= SATELLITES; i++) { //Initialise deadman arrays
-  liveDevices[i] = 0;
-  satelliteLastTransmissionTime[i] = 0;
-}
+	for (int i = 0; i <= SATELLITES; i++) { //Initialise deadman arrays
+	  liveDevices[i] = 0;
+	  satelliteLastTransmissionTime[i] = 0;
+	}
   
   ////Load settings from EEPROM and assign role
   DeviceSettings settings;
@@ -186,11 +183,7 @@ void loop(void) {
     double del_hum_act = 0; //Change in humidity since last transmission
 
     while (role == role_satellite) { //Satellite main loop
-      
-      if (radio.available()) { //If base is checking for life-sign
-        bool basePing = radio.read(&basePing, sizeof(basePing)); //Accept the ping
-      }
-      
+		
       if (millis() - lastSatellitePoll > SATELLITEPOLLPERIOD || millis() < 1000UL) { //If it's time to poll the sensors again
         lastSatellitePoll = millis();
         
@@ -211,32 +204,31 @@ void loop(void) {
 			      || (static_cast<unsigned long int>(millis() - lastCheckedIn) > static_cast<unsigned long int>(DEADMANPERIOD * 95UL / 100UL))) { // or it's time to check in with base
           bool delivered = false;
           
-          radio.stopListening(); //Pause listening to enable transmitting
-  
-          while (!delivered) {
-  
+          for (int attempt = 1; !delivered && attempt <= 50; ) {
+            radio.stopListening(); //Pause listening to enable transmitting
+             
             printf("Now sending ");
             latest.printCSV(); //Print a summary of the transmission being sent.
             
             delivered = radio.write(&latest, sizeof(latest)); //Assigns true if transmission is successfully received by base
-  
             if (delivered) {
-              printf("ok...\n");
-			  lastCheckedIn = millis(); //Update record of last check-in with base
+              printf("Delivered (%i attempts)...\n", attempt);
+              prevPayload = latest; //Update record of last transmission successfully sent
+			        lastCheckedIn = millis(); //Update record of last check-in with base
             }
             else {
               printf("failed.\n\r");
+              delay(13); //Hacky attempt to get out of what may be an ACK/comms-lock
             }
+
+            radio.startListening();
           }
-          prevPayload = latest; //Update record of last transmission successfully sent
-  
-        // Continue listening
-        radio.startListening();
-        }
-        
+          
+				}
+			}
+          
         //fixme Remove and test
         delay(SATELLITELOOPPERIOD); // Loop poll rate.  Adjust sensor poll rate later to match to reduce power consumption.
-      }
     }
   }
 
@@ -250,37 +242,41 @@ void loop(void) {
 
   if (role == role_base) {
    
-   Transmission received(-1, 0.0,0.0);
+    Transmission received(-1, 0.0,0.0);
    
-	if (deviceFailure()) { //Check for devices that haven't touched base recently.  If such exists,
-		//Do an alarm thingy
-    printf("DEVICE FAIL at %lu\n", (millis() / 1000));
-    /*
-		if (!tempFailureBool) {
-    printf("DEVICE DOWN at %lu\n", (millis() / 1000));
-    tempFailureBool = true;
-		}
-	}
- else {
-  if (tempFailureBool) {
-    printf("DEVICE UP at %lu\n", (millis() / 1000));
-    tempFailureBool = false;
-  }*/
- }
-    
-    
-
-    if (radio.available()) { //If a satellite transmission is pending
+  	if (deviceFailure()) { //Check for devices that haven't touched base recently.  If such exists,
+  		//Do an alarm thingy
+      //printf("DEVICE FAIL at %lu\n", (millis() / 1000));
       
+  		if (!deviceWasDown) {
+      printf("DEVICE DOWN at %lu\n", (millis() / 1000));
+      deviceWasDown = true;
+  		}
+     else {
+      //printf("Device still down.\n");
+     }
+  	}
+    else {
+      if (deviceWasDown) {
+        printf("DEVICE UP at %lu\n", (millis() / 1000));
+        deviceWasDown = false;
+      }
+      else {
+        //printf("Device still up.\n");
+      }
+    }
+  
+    if (radio.available()) { //If a satellite transmission is pending
+        
       radio.read(&received, sizeof(received)); //Read it
-
+  
       printf("%i;", received.xmitterID); //Output CSV with ID,
       printf("%lu;", (millis() / 1000)); // timestamp (seconds since base start)
       received.printCSV(); //And values
-	  satelliteLastTransmissionTime[received.xmitterID] = millis();
-      
-      }
-      
+  	  satelliteLastTransmissionTime[received.xmitterID] = millis();
+        
+    }
+        
     // Delay just a little bit to let the other unit
     // make the transition to receiver
     delay(20);
