@@ -24,7 +24,7 @@
 bool deviceWasDown = true; //debug variable for device failure
 
 const unsigned int SATELLITES = 1;
-const unsigned long int DEADMANPERIOD = 1000UL * 60UL * 15UL; // Check in once every fifteen minutes
+const unsigned long int DEADMANPERIOD = 1000UL * 30UL;// DEBUG VALUE 60UL * 15UL; // Check in once every fifteen minutes
 const unsigned long int SATELLITELOOPPERIOD = DEADMANPERIOD / 15UL; // Must be <50% of DEADMANPERIOD and <=SATELLITEPOLLPERIOD
 const unsigned long int SATELLITEPOLLPERIOD = DEADMANPERIOD / 10UL; //Satellite poll rate (5sec for debugging)
 bool liveDevices[SATELLITES + 1]; //Index corresponds with device ID
