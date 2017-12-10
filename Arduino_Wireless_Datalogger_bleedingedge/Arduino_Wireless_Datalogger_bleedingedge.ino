@@ -24,11 +24,11 @@ bool tempFailureBool = false; //debug variable for device failure
 
 const unsigned int SATELLITES = 1;
 const unsigned long int DEADMANPERIOD = 1000UL * 60UL * 60UL;// * 24UL; // Check once per hour
-const unsigned long int SATELLITELOOPPERIOD = 1000UL * 60UL * 5UL; // Must be <95% of DEADMANPERIOD and <=SATELLITEPOLLPERIOD (5min)
-const unsigned long int SATELLITEPOLLPERIOD = 1000UL * 60UL * 15UL; //Satellite poll rate (15min)
+const unsigned long int SATELLITELOOPPERIOD = 1000UL * 60UL * 1UL; // Must be <95% of DEADMANPERIOD and <=SATELLITEPOLLPERIOD (1min)
+const unsigned long int SATELLITEPOLLPERIOD = 1000UL * 60UL * 5UL; //Satellite poll rate (5min)
 bool liveDevices[SATELLITES + 1]; //Index corresponds with device ID
 unsigned long int satelliteLastTransmissionTime[SATELLITES]; //Index corresponds with device ID
-unsigned long int lastCheckedIn = 0; // Holds last time satellite contacted base (by successfully sending a transmission)
+unsigned long int lastCheckedIn = 0; // Holds last time satellite contacted base (by successfully sending a transmission)  Used by sats only.
 
 const float TEMPHYS = 0.5;  // Hysteresis values
 const float HUMHYS = 0.5; 
@@ -124,7 +124,7 @@ for (int i = 0; i <= SATELLITES; i++) { //Initialise deadman arrays
   readTrim();
 
   printf_begin();
-  printf("ROLE: %s with ID %i\n\r", role_friendly_name[role], settings.deviceID);
+  //printf("ROLE: %s with ID %i\n\r", role_friendly_name[role], settings.deviceID);
 
   //
   // Setup and configure rf radio
@@ -164,7 +164,7 @@ for (int i = 0; i <= SATELLITES; i++) { //Initialise deadman arrays
   radio.startListening();
 
   //Commented out for Qt QString compatibility, which can't handle tabs in QString.left()
-  radio.printDetails(); //Outputs detailed information on radio unit and settings
+  //radio.printDetails(); //Outputs detailed information on radio unit and settings
 }
 
 
@@ -191,7 +191,7 @@ void loop(void) {
         bool basePing = radio.read(&basePing, sizeof(basePing)); //Accept the ping
       }
       
-      if (millis() - lastSatellitePoll > SATELLITEPOLLPERIOD) { //If it's time to poll the sensors again
+      if (millis() - lastSatellitePoll > SATELLITEPOLLPERIOD || millis() < 1000UL) { //If it's time to poll the sensors again
         lastSatellitePoll = millis();
         
         // Read the temp and humidity, and send two packets of type double whenever the change is sufficient.
@@ -254,6 +254,7 @@ void loop(void) {
    
 	if (deviceFailure()) { //Check for devices that haven't touched base recently.  If such exists,
 		//Do an alarm thingy
+    printf("DEVICE FAIL at %lu\n", (millis() / 1000));
     /*
 		if (!tempFailureBool) {
     printf("DEVICE DOWN at %lu\n", (millis() / 1000));
