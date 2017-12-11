@@ -75,7 +75,7 @@ bool deviceFailure() {
 	
 	for (int i = 1; i <= SATELLITES; i++) {
 
-		if (static_cast<unsigned long int>(millis() -satelliteLastTransmissionTime[i]) > DEADMANPERIOD) { //5% threshold
+		if (static_cast<unsigned long int>(millis() -satelliteLastTransmissionTime[i]) > DEADMANPERIOD) { 
 			liveDevices[i] = false;
 			deviceFailed = true;
 		}
@@ -168,7 +168,7 @@ void setup(void) {
 void loop(void) {
   
   if (role == role_satellite) {  //Satellite setup
-    long long unsigned int lastSatellitePoll = 0;
+    long long unsigned int lastSensorPoll = 0;
     double temp_act = 0.0, hum_act = 0.0;
     signed long int temp_cal;
     unsigned long int hum_cal;
@@ -182,10 +182,12 @@ void loop(void) {
     double del_temp_act = 0; //Change in temperature since last transmission
     double del_hum_act = 0; //Change in humidity since last transmission
 
+    printf("CHECKINPERIOD: %lu, DEADMANPERIOD: %lu\n", CHECKINPERIOD, DEADMANPERIOD);
+
     while (role == role_satellite) { //Satellite main loop
 		
-      if (millis() - lastSatellitePoll > SENSORPOLLPERIOD || millis() < 1000UL) { //If it's time to poll the sensors again
-        lastSatellitePoll = millis();
+      if ((millis() - lastSensorPoll > SENSORPOLLPERIOD) || millis() < 1000UL) { //If it's time to poll the sensors again
+        lastSensorPoll = millis();
         
         // Read the temp and humidity, and send two packets of type double whenever the change is sufficient.
         readData();
@@ -199,6 +201,8 @@ void loop(void) {
                int(hum_act * 10) % 10);
   
         Transmission latest(deviceID, temp_act, hum_act); //Create new transmission
+
+        printf("Checking %lu > %lu with SATELLITELOOPPERIOD %lu\n", (millis() - lastCheckedIn), CHECKINPERIOD, SATELLITELOOPPERIOD);
         
         if (latest.changed(prevPayload, TEMPHYS, HUMHYS) //If new values are sufficiently different
 			      || ((millis() - lastCheckedIn) > CHECKINPERIOD)) { // or it's time to check in with base
