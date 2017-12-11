@@ -25,14 +25,14 @@ bool deviceWasDown = true; //debug variable for device failure
 
 const unsigned int SATELLITES = 1;
 const unsigned long int DEADMANPERIOD = 1000UL * 30UL;// DEBUG VALUE 60UL * 15UL; // Check in once every fifteen minutes
-const unsigned long int SATELLITELOOPPERIOD = DEADMANPERIOD / 15UL; // Must be <50% of DEADMANPERIOD and <=SATELLITEPOLLPERIOD
+const unsigned long int SATELLITELOOPPERIOD = DEADMANPERIOD / 30UL; // Must be <10% of DEADMANPERIOD (for 0.90 threshold) and <=SATELLITEPOLLPERIOD
 const unsigned long int SATELLITEPOLLPERIOD = DEADMANPERIOD / 10UL; //Satellite poll rate (5sec for debugging)
 bool liveDevices[SATELLITES + 1]; //Index corresponds with device ID
 unsigned long int satelliteLastTransmissionTime[SATELLITES]; //Index corresponds with device ID
 unsigned long int lastCheckedIn = 0; // Holds last time satellite contacted base (by successfully sending a transmission)  Used by sats only.
 
-const float TEMPHYS = 0.5;  // Hysteresis values
-const float HUMHYS = 0.5; 
+const float TEMPHYS = 5;  // Hysteresis values in deci-units
+const float HUMHYS = 5; 
 
 // Set up nRF24L01 radio on SPI bus plus pins 9 & 10 
 RF24 radio(9, 10);
@@ -201,7 +201,7 @@ void loop(void) {
         Transmission latest(deviceID, temp_act, hum_act); //Create new transmission
         
         if (latest.changed(prevPayload, TEMPHYS, HUMHYS) //If new values are sufficiently different
-			      || (static_cast<unsigned long int>(millis() - lastCheckedIn) > static_cast<unsigned long int>(DEADMANPERIOD * 95UL / 100UL))) { // or it's time to check in with base
+			      || (static_cast<unsigned long int>(millis() - lastCheckedIn) > static_cast<unsigned long int>(DEADMANPERIOD * 90UL / 100UL))) { // or it's time to check in with base
           bool delivered = false;
           
           for (int attempt = 1; !delivered && attempt <= 50; ) {
