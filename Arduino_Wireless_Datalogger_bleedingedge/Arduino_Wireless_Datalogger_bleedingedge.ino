@@ -29,7 +29,7 @@ unsigned long int lastCheckedIn = 0; // Holds last time satellite contacted base
 
   ////Definable variables that determine transmission frequency////
 const int DEADMANTHRESHOLD = 10; //Exceeding CHECKINTIME by 10% will cause deadman alarm
-const unsigned long int CHECKINPERIOD = 1000UL * 30UL;// DEBUG VALUE 60UL * 15UL; // Check in once every fifteen minutes
+const unsigned long int CHECKINPERIOD = 1000UL * 10UL;// DEBUG VALUE 60UL * 15UL; // Check in once every fifteen minutes
 const float TEMPHYS = 5;  // Hysteresis values in deci-units
 const float HUMHYS = 5; 
 
