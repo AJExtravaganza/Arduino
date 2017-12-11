@@ -22,17 +22,21 @@
 
 //When set to false, this seems to initialise every loop, which is concerning
 bool deviceWasDown = true; //debug variable for device failure
-
 const unsigned int SATELLITES = 1;
-const unsigned long int DEADMANPERIOD = 1000UL * 30UL;// DEBUG VALUE 60UL * 15UL; // Check in once every fifteen minutes
-const unsigned long int SATELLITELOOPPERIOD = DEADMANPERIOD / 15UL; // Must be <50% of DEADMANPERIOD and <=SATELLITEPOLLPERIOD
-const unsigned long int SATELLITEPOLLPERIOD = DEADMANPERIOD / 10UL; //Satellite poll rate (5sec for debugging)
 bool liveDevices[SATELLITES + 1]; //Index corresponds with device ID
 unsigned long int satelliteLastTransmissionTime[SATELLITES]; //Index corresponds with device ID
 unsigned long int lastCheckedIn = 0; // Holds last time satellite contacted base (by successfully sending a transmission)  Used by sats only.
 
-const float TEMPHYS = 0.5;  // Hysteresis values
-const float HUMHYS = 0.5; 
+  ////Definable variables that determine transmission frequency////
+const int DEADMANTHRESHOLD = 10; //Exceeding CHECKINTIME by 10% will cause deadman alarm
+const unsigned long int CHECKINPERIOD = 1000UL * 30UL;// DEBUG VALUE 60UL * 15UL; // Check in once every fifteen minutes
+const float TEMPHYS = 5;  // Hysteresis values in deci-units
+const float HUMHYS = 5; 
+
+  ////These are Tingle's magic derived constants.  Do not touch them.////
+const unsigned long int DEADMANPERIOD = CHECKINPERIOD * (100UL + static_cast<unsigned long int>(DEADMANTHRESHOLD)) / 100UL;
+const unsigned long int SENSORPOLLPERIOD = CHECKINPERIOD / 10UL - 1UL; //Must be <DEADMANTHRESHOLD% of DEADMANPERIOD
+const unsigned long int SATELLITELOOPPERIOD = SENSORPOLLPERIOD / 3UL; // Must be <=SENSORPOLLPERIOD
 
 // Set up nRF24L01 radio on SPI bus plus pins 9 & 10 
 RF24 radio(9, 10);
@@ -70,18 +74,14 @@ bool deviceFailure() {
 	bool deviceFailed = false;
 	
 	for (int i = 1; i <= SATELLITES; i++) {
-		//printf("Device %i ", i);
-		
-		if (static_cast<unsigned long int>(millis() -satelliteLastTransmissionTime[i]) > DEADMANPERIOD) {
+
+		if (static_cast<unsigned long int>(millis() -satelliteLastTransmissionTime[i]) > DEADMANPERIOD) { 
 			liveDevices[i] = false;
-			//printf("DOWN. ");
 			deviceFailed = true;
 		}
 		else {
 			liveDevices[i] = true;
-			//printf("UP. ");
 		}
-		//printf("\n");
 	}
 	
 	return deviceFailed;
@@ -168,7 +168,7 @@ void setup(void) {
 void loop(void) {
   
   if (role == role_satellite) {  //Satellite setup
-    long long unsigned int lastSatellitePoll = 0;
+    long long unsigned int lastSensorPoll = 0;
     double temp_act = 0.0, hum_act = 0.0;
     signed long int temp_cal;
     unsigned long int hum_cal;
@@ -182,10 +182,12 @@ void loop(void) {
     double del_temp_act = 0; //Change in temperature since last transmission
     double del_hum_act = 0; //Change in humidity since last transmission
 
+    printf("CHECKINPERIOD: %lu, DEADMANPERIOD: %lu\n", CHECKINPERIOD, DEADMANPERIOD);
+
     while (role == role_satellite) { //Satellite main loop
 		
-      if (millis() - lastSatellitePoll > SATELLITEPOLLPERIOD || millis() < 1000UL) { //If it's time to poll the sensors again
-        lastSatellitePoll = millis();
+      if ((millis() - lastSensorPoll > SENSORPOLLPERIOD) || millis() < 1000UL) { //If it's time to poll the sensors again
+        lastSensorPoll = millis();
         
         // Read the temp and humidity, and send two packets of type double whenever the change is sufficient.
         readData();
@@ -199,9 +201,11 @@ void loop(void) {
                int(hum_act * 10) % 10);
   
         Transmission latest(deviceID, temp_act, hum_act); //Create new transmission
+
+        printf("Checking %lu > %lu with SATELLITELOOPPERIOD %lu\n", (millis() - lastCheckedIn), CHECKINPERIOD, SATELLITELOOPPERIOD);
         
         if (latest.changed(prevPayload, TEMPHYS, HUMHYS) //If new values are sufficiently different
-			      || (static_cast<unsigned long int>(millis() - lastCheckedIn) > static_cast<unsigned long int>(DEADMANPERIOD * 95UL / 100UL))) { // or it's time to check in with base
+			      || ((millis() - lastCheckedIn) > CHECKINPERIOD)) { // or it's time to check in with base
           bool delivered = false;
           
           for (int attempt = 1; !delivered && attempt <= 50; ) {
