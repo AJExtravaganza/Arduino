@@ -53,6 +53,27 @@ const char* role_friendly_name[] = {"invalid", "base", "satellite"};
 int deviceID = -1;
 role_e role = role_base;
 
+void checkDeviceStatus(int deviceID) {
+	bool wasLive = satellites[deviceID].deviceUp;
+      
+			if (deviceFailure(deviceID)) { //Check for devices that haven't touched base recently.  If such exists,
+				if (wasLive) {
+					printf("STS;%i;0;%lu\n", deviceID, (millis() / 1000));
+				}
+			 else {
+				//printf("Device still down.\n");
+			 }
+			}
+			else {
+				if (!wasLive) {
+					printf("STS;%i;1;%lu\n", deviceID, (millis() / 1000));
+				}
+				else {
+					//printf("Device still up.\n");
+				}
+			}
+}
+
 bool deviceFailure(int deviceID) {
   
     if (static_cast<unsigned long int>(millis() - satelliteLastTransmissionTime[deviceID]) > DEADMANPERIOD && millis() > SATELLITELOOPPERIOD) { 
@@ -224,25 +245,7 @@ void loop(void) {
     Transmission received(-1, 0.0,0.0);
 			////////SET UP TO USE INDIVIDUAL isUp BOOLS LATER ON////////
     for (int i = 1; i <= SATELLITES; i++) {
-			
-      bool wasLive = satellites[i].deviceUp;
-      
-			if (deviceFailure(i)) { //Check for devices that haven't touched base recently.  If such exists,
-				if (wasLive) {
-				printf("DEVICE %i DOWN at %lu\n", i, (millis() / 1000));
-				}
-			 else {
-				//printf("Device still down.\n");
-			 }
-			}
-			else {
-				if (!wasLive) {
-					printf("DEVICE %i UP at %lu\n", i, (millis() / 1000));
-				}
-				else {
-					//printf("Device still up.\n");
-				}
-			}
+			checkDeviceStatus(i);
 	  }
   
     if (radio.available()) { //If a satellite transmission is pending
