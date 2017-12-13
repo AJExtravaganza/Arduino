@@ -13,7 +13,6 @@
 bool deviceWasDown = true; //debug variable for device failure
 const unsigned int SATELLITES = 1;
 const unsigned int DEVICES = SATELLITES + 1;
-bool liveDevices[DEVICES]; //Index corresponds with device ID
 unsigned long int satelliteLastTransmissionTime[DEVICES]; //Index corresponds with device ID
 unsigned long int lastCheckedIn = 0; // Holds last time satellite contacted base (by successfully sending a transmission)  Used by sats only.
 
@@ -57,13 +56,13 @@ role_e role = role_base;
 bool deviceFailure(int deviceID) {
   
     if (static_cast<unsigned long int>(millis() - satelliteLastTransmissionTime[deviceID]) > DEADMANPERIOD && millis() > SATELLITELOOPPERIOD) { 
-      liveDevices[deviceID] = false;
+      satellites[deviceID].deviceUp = false;
     }
     else {
-      liveDevices[deviceID] = true;
+      satellites[deviceID].deviceUp = true;
     }
 
-  	return !liveDevices[deviceID];
+  	return !satellites[deviceID].deviceUp;
 }
 
 void update(Transmission received) {
@@ -77,7 +76,7 @@ void setup(void) {
   ////Initialise global arrays
   for (int i = 1; i <= SATELLITES; i++) { //Initialise deadman arrays
     satellites[i].deviceID = i;
-		liveDevices[i] = true;
+		satellites[i].deviceUp = true;
     satelliteLastTransmissionTime[i] = 0UL;
   }
   
@@ -225,8 +224,8 @@ void loop(void) {
     Transmission received(-1, 0.0,0.0);
 			////////SET UP TO USE INDIVIDUAL isUp BOOLS LATER ON////////
     for (int i = 1; i <= SATELLITES; i++) {
-
-      bool wasLive = liveDevices[i];
+			
+      bool wasLive = satellites[i].deviceUp;
       
 			if (deviceFailure(i)) { //Check for devices that haven't touched base recently.  If such exists,
 				if (wasLive) {
