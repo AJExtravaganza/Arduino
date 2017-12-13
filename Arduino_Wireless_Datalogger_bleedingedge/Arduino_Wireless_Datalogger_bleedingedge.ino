@@ -24,8 +24,9 @@
 //When set to false, this seems to initialise every loop, which is concerning
 bool deviceWasDown = true; //debug variable for device failure
 const unsigned int SATELLITES = 1;
-bool liveDevices[SATELLITES + 1]; //Index corresponds with device ID
-unsigned long int satelliteLastTransmissionTime[SATELLITES + 1]; //Index corresponds with device ID
+const unsigned int DEVICES = SATELLITES + 1;
+bool liveDevices[DEVICES]; //Index corresponds with device ID
+unsigned long int satelliteLastTransmissionTime[DEVICES]; //Index corresponds with device ID
 unsigned long int lastCheckedIn = 0; // Holds last time satellite contacted base (by successfully sending a transmission)  Used by sats only.
 
   ////Definable variables that determine transmission frequency////
@@ -40,7 +41,7 @@ const unsigned long int SENSORPOLLPERIOD = CHECKINPERIOD / 10UL - 1UL; //Must be
 const unsigned long int SATELLITELOOPPERIOD = SENSORPOLLPERIOD / 3UL; // Must be <=SENSORPOLLPERIOD
 
 	////Satellite objects for base station
-Satellite satellites[6];
+Satellite satellites[DEVICES];
 
 // Set up nRF24L01 radio on SPI bus plus pins 9 & 10 
 RF24 radio(9, 10);
@@ -93,23 +94,27 @@ role_e role = role_base;
 
 bool deviceFailure(int deviceID) {
   
-    if (static_cast<unsigned long int>(millis() - satelliteLastTransmissionTime[deviceID]) > DEADMANPERIOD) { 
+    if (static_cast<unsigned long int>(millis() - satelliteLastTransmissionTime[deviceID]) > DEADMANPERIOD && millis() > SATELLITELOOPPERIOD) { 
       liveDevices[deviceID] = false;
+      //printf("Checking: It's dead.\n");//debug
     }
     else {
       liveDevices[deviceID] = true;
+      //printf("Checking: It's not dead.\n");//debug
     }
-  printf("deviceFailure() returning %lu - %lu = %lu > %lu status %i\n", millis(), satelliteLastTransmissionTime[deviceID], static_cast<unsigned long int>(millis() - satelliteLastTransmissionTime[deviceID]), DEADMANPERIOD, liveDevices[deviceID]);  
-	return liveDevices[deviceID];
+
+  	return !liveDevices[deviceID];
 }
 
 void setup(void) {
 
   Serial.begin(57600);
 
-   printf("why the fuck can't I see this in serial?");
-  
-	
+  ////Initialise global arrays
+  for (int i = 1; i <= SATELLITES; i++) { //Initialise deadman arrays
+    liveDevices[i] = true;
+    satelliteLastTransmissionTime[i] = 0UL;
+  }
   
   ////Load settings from EEPROM and assign role
   DeviceSettings settings;
@@ -179,12 +184,6 @@ void setup(void) {
 
   //Commented out for Qt QString compatibility, which can't handle tabs in QString.left()
   //radio.printDetails(); //Outputs detailed information on radio unit and settings
-
-  for (int i = 1; i <= SATELLITES; i++) { //Initialise deadman arrays
-    liveDevices[i] = 1;
-    satelliteLastTransmissionTime[i] = 0UL;
-   printf ("Initialised live(%i) and last transmission (%lu) for device %i\n", liveDevices[i], satelliteLastTransmissionTime[i], i); //debug
-  }
 }
 
 
@@ -263,10 +262,7 @@ void loop(void) {
 
 
 
-  //
-  // base role; Device connected to computer which receives transmissions from the satellite
-  //
-
+  //// Base role; Device connected to computer to receive transmissions from the satellite
   if (role == role_base) {
    
     Transmission received(-1, 0.0,0.0);
@@ -274,9 +270,10 @@ void loop(void) {
     for (int i = 1; i <= SATELLITES; i++) {
 
       bool wasLive = liveDevices[i];
+      //printf("wasLive = %i\n", wasLive);//debug
       
 			if (deviceFailure(i)) { //Check for devices that haven't touched base recently.  If such exists,
-				
+				//printf("isLive = %i\n", liveDevices[i]);//debug
 				if (wasLive) {
 				printf("DEVICE %i DOWN at %lu\n", i, (millis() / 1000));
 				//liveDevices[i] = false; //redundant
