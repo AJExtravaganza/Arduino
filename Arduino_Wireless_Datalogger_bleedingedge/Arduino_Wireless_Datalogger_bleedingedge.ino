@@ -9,15 +9,13 @@
 #include "Satellite.h"
 #include "BME280.h"
 
-//When set to false, this seems to initialise every loop, which is concerning
-bool deviceWasDown = true; //debug variable for device failure
+
 const unsigned int SATELLITES = 1;
 const unsigned int DEVICES = SATELLITES + 1;
-unsigned long int satelliteLastTransmissionTime[DEVICES]; //Index corresponds with device ID
 unsigned long int lastCheckedIn = 0; // Holds last time satellite contacted base (by successfully sending a transmission)  Used by sats only.
 
   ////Definable variables that determine transmission frequency////
-const unsigned long int CHECKINPERIOD = 1000UL *  10UL;//60UL * 15UL; // Check in once every fifteen minutes
+const unsigned long int CHECKINPERIOD = 1000UL *  10UL * 60UL * 15UL; // Check in once every fifteen minutes
 const int DEADMANTHRESHOLD = 10; //Exceeding CHECKINPERIOD by 10% will cause deadman alarm
 
 	//// Hysteresis values in deci-units
@@ -53,6 +51,7 @@ const char* role_friendly_name[] = {"invalid", "base", "satellite"};
 int deviceID = -1;
 role_e role = role_base;
 
+	//// Process devices that have just changed status (by generating STS transmissions to GUI).
 void checkDeviceStatus(int deviceID) {
 	bool wasLive = satellites[deviceID].deviceUp;
       
@@ -74,9 +73,10 @@ void checkDeviceStatus(int deviceID) {
 			}
 }
 
+	//// Has particular Satellite gone >DEADMANPERIOD without checking in?
 bool deviceFailure(int deviceID) {
   
-    if (static_cast<unsigned long int>(millis() - satelliteLastTransmissionTime[deviceID]) > DEADMANPERIOD && millis() > SATELLITELOOPPERIOD) { 
+    if (static_cast<unsigned long int>(millis() - satellites[deviceID].lastTransmission) > DEADMANPERIOD && millis() > SATELLITELOOPPERIOD) { 
       satellites[deviceID].deviceUp = false;
     }
     else {
@@ -86,28 +86,28 @@ bool deviceFailure(int deviceID) {
   	return !satellites[deviceID].deviceUp;
 }
 
+	//// Translate Transmission data update to raw values
 void update(Transmission received) {
 	satellites[received.xmitterID].update(received.getRawTemp(), received.getRawHum(), millis());
 }
 
 void setup(void) {
-
+	
+		//// Start the serial service.
   Serial.begin(57600);
 
-  ////Initialise global arrays
-  for (int i = 1; i <= SATELLITES; i++) { //Initialise deadman arrays
+		////Initialise Satellite object deviceIDs
+  for (int i = 1; i <= SATELLITES; i++) { 
     satellites[i].deviceID = i;
-		satellites[i].deviceUp = true;
-    satelliteLastTransmissionTime[i] = 0UL;
   }
   
-  ////Load settings from EEPROM and assign role
+  //// Load settings from EEPROM and assign role
   DeviceSettings settings;
   settings.read();
   deviceID = settings.deviceID;
   role = settings.deviceID == 0 ? role_base : role_satellite;
   
-  ////BME280 and SPI Setup
+  //// BME280 and SPI Setup
   uint8_t osrs_t = 1;             //Temperature oversampling x 1
   uint8_t osrs_p = 1;             //Pressure oversampling x 1
   uint8_t osrs_h = 1;             //Humidity oversampling x 1
@@ -130,25 +130,21 @@ void setup(void) {
   printf_begin();
   //printf("ROLE: %s with ID %i\n\r", role_friendly_name[role], settings.deviceID);
 
-  //
-  // Setup and configure rf radio
-  //
-
+		////Radio Configuration
   radio.begin();
 
   // optionally, increase the delay between retries & # of retries
   radio.setRetries(15, 15);
 
-  // optionally, reduce the payload size.  seems to
-  // improve reliability
+  // optionally, reduce the payload size.  seems to improve reliability
   radio.setPayloadSize(8);
 
   radio.setDataRate(RF24_250KBPS);
   
-  // Set radio amplification level
+		//// Set radio pre-amp level
   radio.setPALevel(RF24_PA_MAX);
 
-	//// Open pipes for Transmission send/receive
+		//// Open pipes for Transmission send/receive
   if (role == role_base) {
     radio.openReadingPipe(1, pipes[0]); //Open channel to receive comms from all satellites
   }
@@ -243,24 +239,27 @@ void loop(void) {
   if (role == role_base) {
    
     Transmission received(-1, 0.0,0.0);
-			////////SET UP TO USE INDIVIDUAL isUp BOOLS LATER ON////////
+		
+			//// Check each device's status
     for (int i = 1; i <= SATELLITES; i++) {
 			checkDeviceStatus(i);
 	  }
   
-    if (radio.available()) { //If a satellite transmission is pending
+			//// Process incoming Transmissions
+    if (radio.available()) { // If an incoming transmission is pending
         
-      radio.read(&received, sizeof(received)); //Read it
+      radio.read(&received, sizeof(received)); // Read it
 			
-			update(received);
+			update(received); // Update the relevant Satellite object with the new values
 			
-      printf("%i;", received.xmitterID); //Output CSV with ID,
-      printf("%lu;", (millis() / 1000)); // timestamp (seconds since base start)
-      received.printCSV(); //And values
-  	  satelliteLastTransmissionTime[received.xmitterID] = millis();
+      printf("%i;", received.xmitterID); // Output CSV with ID,
+      printf("%lu;", (millis() / 1000)); // timestamp (seconds since base start),
+      received.printCSV(); // and values.
+  	  satellites[received.xmitterID].lastTransmission = millis(); // Update time record of most recent  transmission for deadman purposes.
 
       //printf("low hlim is %i, hum is %i, first OOR on %lu, current time elapsed %lu, grace period is %lu, alarm condition is %i, alarm status is %i\n", satellites[received.xmitterID].humLowLimit, satellites[received.xmitterID].humRawValue, satellites[received.xmitterID].humFirstOOR, satellites[received.xmitterID].lastTransmission, satellites[received.xmitterID].humAlarmGracePeriod, ((satellites[received.xmitterID].lastTransmission - satellites[received.xmitterID].humFirstOOR) > satellites[received.xmitterID].humAlarmGracePeriod), satellites[received.xmitterID].humLowAlarm);
   
+				//// Temporary alarm processing
       if (satellites[received.xmitterID].tempLowAlarm || 
          satellites[received.xmitterID].tempHighAlarm || 
           satellites[received.xmitterID].humLowAlarm || 
@@ -270,9 +269,7 @@ void loop(void) {
       }
         
     }
-        
-    // Delay just a little bit to let the other unit
-    // make the transition to receiver
+			////Delay to allow satellite to switch to receive mode (currently not useful).
     delay(20);
   }
 }

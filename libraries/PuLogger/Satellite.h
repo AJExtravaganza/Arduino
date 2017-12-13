@@ -46,8 +46,6 @@ public:
 	
   float getTemp();
   float getHum();
-  /*void printCSV() {printf("%i;%i;\n", int(getTemp()), int(getHum()),
-              int(getHum() * 10) % 10);}*/
 };
 
 #endif
