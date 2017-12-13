@@ -1,9 +1,3 @@
-//// TO DO
-//// Work on implementing controls signal communication so that base station can drive outputs on the satellite
-//// Sanity check for erroneous values (temp/hum should not change more than 1-2deg at a time, and value in array should be limited to this range of change
-//// Remember to comment out debug for final deployment
-
-
 #include <EEPROM.h>
 #include <Wire.h>
 #include <SPI.h>
@@ -14,12 +8,6 @@
 #include "Transmission.h"
 #include "Satellite.h"
 #include "BME280.h"
-
-
-//
-// Hardware configuration
-//
-
 
 //When set to false, this seems to initialise every loop, which is concerning
 bool deviceWasDown = true; //debug variable for device failure
@@ -48,21 +36,10 @@ Satellite satellites[DEVICES];
 // Set up nRF24L01 radio on SPI bus plus pins 9 & 10 
 RF24 radio(9, 10);
 
-
-//
-// Topology
-//
-
 // Radio pipe addresses for 6 nodes to communicate.
 const uint64_t pipes[6] = {0xF0F0F0F0D0LL, 0xF0F0F0F0D1LL, 0xF0F0F0F0D2LL, 0xF0F0F0F0D3LL, 0xF0F0F0F0D4LL, 0xF0F0F0F0D5LL};
 
-
-//
-// Role management
-//
-// Set up role.  This sketch uses the same software for all the nodes
-// in this system.  Doing so greatly simplifies testing.  
-//
+	//// Role management
 
 // The various roles supported by this sketch
 typedef enum {
@@ -77,35 +54,20 @@ const char* role_friendly_name[] = {"invalid", "base", "satellite"};
 int deviceID = -1;
 role_e role = role_base;
 
-/*bool deviceFailure() {
-	bool deviceFailed = false;
-	
-	for (int i = 1; i <= SATELLITES; i++) {
-
-		if (static_cast<unsigned long int>(millis() -satelliteLastTransmissionTime[i]) > DEADMANPERIOD) { 
-			liveDevices[i] = false;
-			deviceFailed = true;
-		}
-		else {
-			liveDevices[i] = true;
-		}
-	}
-  return deviceFailed;
-}
-*/
-
 bool deviceFailure(int deviceID) {
   
     if (static_cast<unsigned long int>(millis() - satelliteLastTransmissionTime[deviceID]) > DEADMANPERIOD && millis() > SATELLITELOOPPERIOD) { 
       liveDevices[deviceID] = false;
-      //printf("Checking: It's dead.\n");//debug
     }
     else {
       liveDevices[deviceID] = true;
-      //printf("Checking: It's not dead.\n");//debug
     }
 
   	return !liveDevices[deviceID];
+}
+
+void update(Transmission received) {
+	satellites[received.xmitterID].update(received.getRawTemp(), received.getRawHum(), millis());
 }
 
 void setup(void) {
@@ -114,7 +76,8 @@ void setup(void) {
 
   ////Initialise global arrays
   for (int i = 1; i <= SATELLITES; i++) { //Initialise deadman arrays
-    liveDevices[i] = true;
+    satellites[i].deviceID = i;
+		liveDevices[i] = true;
     satelliteLastTransmissionTime[i] = 0UL;
   }
   
@@ -165,15 +128,7 @@ void setup(void) {
   // Set radio amplification level
   radio.setPALevel(RF24_PA_MAX);
 
-  //
-  // Open pipes to other nodes for communication
-  //
-
-  // This simple sketch opens two pipes for these two nodes to communicate
-  // back and forth.
-  // Open 'our' pipe for writing
-  // Open the 'other' pipe for reading, in position #1 (we can have up to 5 pipes open for reading)
-
+	//// Open pipes for Transmission send/receive
   if (role == role_base) {
     radio.openReadingPipe(1, pipes[0]); //Open channel to receive comms from all satellites
   }
@@ -272,13 +227,10 @@ void loop(void) {
     for (int i = 1; i <= SATELLITES; i++) {
 
       bool wasLive = liveDevices[i];
-      //printf("wasLive = %i\n", wasLive);//debug
       
 			if (deviceFailure(i)) { //Check for devices that haven't touched base recently.  If such exists,
-				//printf("isLive = %i\n", liveDevices[i]);//debug
 				if (wasLive) {
 				printf("DEVICE %i DOWN at %lu\n", i, (millis() / 1000));
-				//liveDevices[i] = false; //redundant
 				}
 			 else {
 				//printf("Device still down.\n");
@@ -287,7 +239,6 @@ void loop(void) {
 			else {
 				if (!wasLive) {
 					printf("DEVICE %i UP at %lu\n", i, (millis() / 1000));
-					//liveDevices[i] = true; //redundant
 				}
 				else {
 					//printf("Device still up.\n");
@@ -298,11 +249,23 @@ void loop(void) {
     if (radio.available()) { //If a satellite transmission is pending
         
       radio.read(&received, sizeof(received)); //Read it
-  
+			
+			update(received);
+			
       printf("%i;", received.xmitterID); //Output CSV with ID,
       printf("%lu;", (millis() / 1000)); // timestamp (seconds since base start)
       received.printCSV(); //And values
   	  satelliteLastTransmissionTime[received.xmitterID] = millis();
+
+      //printf("low hlim is %i, hum is %i, first OOR on %lu, current time elapsed %lu, grace period is %lu, alarm condition is %i, alarm status is %i\n", satellites[received.xmitterID].humLowLimit, satellites[received.xmitterID].humRawValue, satellites[received.xmitterID].humFirstOOR, satellites[received.xmitterID].lastTransmission, satellites[received.xmitterID].humAlarmGracePeriod, ((satellites[received.xmitterID].lastTransmission - satellites[received.xmitterID].humFirstOOR) > satellites[received.xmitterID].humAlarmGracePeriod), satellites[received.xmitterID].humLowAlarm);
+  
+      if (satellites[received.xmitterID].tempLowAlarm || 
+         satellites[received.xmitterID].tempHighAlarm || 
+          satellites[received.xmitterID].humLowAlarm || 
+          satellites[received.xmitterID].humHighAlarm){
+        printf("Alarm Condition!\nAutoClearing alarms until GUI is ready.\n");
+        satellites[received.xmitterID].clearAlarms(); // Necessary until GUI is able to command base
+      }
         
     }
         
