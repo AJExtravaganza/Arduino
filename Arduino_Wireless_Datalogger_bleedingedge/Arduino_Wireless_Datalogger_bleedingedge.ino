@@ -12,6 +12,7 @@
 #include "printf.h"
 #include "DeviceSettings.h"
 #include "Transmission.h"
+#include "Satellite.h"
 #include "BME280.h"
 
 
@@ -23,20 +24,26 @@
 //When set to false, this seems to initialise every loop, which is concerning
 bool deviceWasDown = true; //debug variable for device failure
 const unsigned int SATELLITES = 1;
-bool liveDevices[SATELLITES + 1]; //Index corresponds with device ID
-unsigned long int satelliteLastTransmissionTime[SATELLITES]; //Index corresponds with device ID
+const unsigned int DEVICES = SATELLITES + 1;
+bool liveDevices[DEVICES]; //Index corresponds with device ID
+unsigned long int satelliteLastTransmissionTime[DEVICES]; //Index corresponds with device ID
 unsigned long int lastCheckedIn = 0; // Holds last time satellite contacted base (by successfully sending a transmission)  Used by sats only.
 
   ////Definable variables that determine transmission frequency////
-const int DEADMANTHRESHOLD = 10; //Exceeding CHECKINTIME by 10% will cause deadman alarm
 const unsigned long int CHECKINPERIOD = 1000UL *  60UL * 15UL; // Check in once every fifteen minutes
-const float TEMPHYS = 5;  // Hysteresis values in deci-units
+const int DEADMANTHRESHOLD = 10; //Exceeding CHECKINPERIOD by 10% will cause deadman alarm
+
+	//// Hysteresis values in deci-units
+const float TEMPHYS = 5;  
 const float HUMHYS = 5; 
 
   ////These are Tingle's magic derived constants.  Do not touch them.////
 const unsigned long int DEADMANPERIOD = CHECKINPERIOD * (100UL + static_cast<unsigned long int>(DEADMANTHRESHOLD)) / 100UL;
 const unsigned long int SENSORPOLLPERIOD = CHECKINPERIOD / 10UL - 1UL; //Must be <DEADMANTHRESHOLD% of DEADMANPERIOD
 const unsigned long int SATELLITELOOPPERIOD = SENSORPOLLPERIOD / 3UL; // Must be <=SENSORPOLLPERIOD
+
+	////Satellite objects for base station
+Satellite satellites[DEVICES];
 
 // Set up nRF24L01 radio on SPI bus plus pins 9 & 10 
 RF24 radio(9, 10);
@@ -70,7 +77,7 @@ const char* role_friendly_name[] = {"invalid", "base", "satellite"};
 int deviceID = -1;
 role_e role = role_base;
 
-bool deviceFailure() {
+/*bool deviceFailure() {
 	bool deviceFailed = false;
 	
 	for (int i = 1; i <= SATELLITES; i++) {
@@ -83,15 +90,33 @@ bool deviceFailure() {
 			liveDevices[i] = true;
 		}
 	}
-	
-	return deviceFailed;
+  return deviceFailed;
+}
+*/
+
+bool deviceFailure(int deviceID) {
+  
+    if (static_cast<unsigned long int>(millis() - satelliteLastTransmissionTime[deviceID]) > DEADMANPERIOD && millis() > SATELLITELOOPPERIOD) { 
+      liveDevices[deviceID] = false;
+      //printf("Checking: It's dead.\n");//debug
+    }
+    else {
+      liveDevices[deviceID] = true;
+      //printf("Checking: It's not dead.\n");//debug
+    }
+
+  	return !liveDevices[deviceID];
 }
 
 void setup(void) {
-	for (int i = 0; i <= SATELLITES; i++) { //Initialise deadman arrays
-	  liveDevices[i] = 0;
-	  satelliteLastTransmissionTime[i] = 0;
-	}
+
+  Serial.begin(57600);
+
+  ////Initialise global arrays
+  for (int i = 1; i <= SATELLITES; i++) { //Initialise deadman arrays
+    liveDevices[i] = true;
+    satelliteLastTransmissionTime[i] = 0UL;
+  }
   
   ////Load settings from EEPROM and assign role
   DeviceSettings settings;
@@ -112,7 +137,6 @@ void setup(void) {
   uint8_t config_reg = (t_sb << 5) | (filter << 2) | spi3w_en;
   uint8_t ctrl_hum_reg = osrs_h;
 
-  Serial.begin(57600);
   Wire.begin();
 
   writeReg(0xF2, ctrl_hum_reg);
@@ -240,35 +264,36 @@ void loop(void) {
 
 
 
-  //
-  // base role; Device connected to computer which receives transmissions from the satellite
-  //
-
+  //// Base role; Device connected to computer to receive transmissions from the satellite
   if (role == role_base) {
    
     Transmission received(-1, 0.0,0.0);
-   
-  	if (deviceFailure()) { //Check for devices that haven't touched base recently.  If such exists,
-  		//Do an alarm thingy
-      //printf("DEVICE FAIL at %lu\n", (millis() / 1000));
+			////////SET UP TO USE INDIVIDUAL isUp BOOLS LATER ON////////
+    for (int i = 1; i <= SATELLITES; i++) {
+
+      bool wasLive = liveDevices[i];
+      //printf("wasLive = %i\n", wasLive);//debug
       
-  		if (!deviceWasDown) {
-      printf("DEVICE DOWN at %lu\n", (millis() / 1000));
-      deviceWasDown = true;
-  		}
-     else {
-      //printf("Device still down.\n");
-     }
-  	}
-    else {
-      if (deviceWasDown) {
-        printf("DEVICE UP at %lu\n", (millis() / 1000));
-        deviceWasDown = false;
-      }
-      else {
-        //printf("Device still up.\n");
-      }
-    }
+			if (deviceFailure(i)) { //Check for devices that haven't touched base recently.  If such exists,
+				//printf("isLive = %i\n", liveDevices[i]);//debug
+				if (wasLive) {
+				printf("DEVICE %i DOWN at %lu\n", i, (millis() / 1000));
+				//liveDevices[i] = false; //redundant
+				}
+			 else {
+				//printf("Device still down.\n");
+			 }
+			}
+			else {
+				if (!wasLive) {
+					printf("DEVICE %i UP at %lu\n", i, (millis() / 1000));
+					//liveDevices[i] = true; //redundant
+				}
+				else {
+					//printf("Device still up.\n");
+				}
+			}
+	  }
   
     if (radio.available()) { //If a satellite transmission is pending
         
