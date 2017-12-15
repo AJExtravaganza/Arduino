@@ -28,8 +28,8 @@ void Satellite::update(int tempRawValue, int humRawValue, unsigned long int curr
 	Satellite::lastTransmission = currentTimeElapsed;
 	
 	Satellite::procAlarms(currentTimeElapsed);
-}
 
+}
 	//// Is temperature between the high and low limits?
 bool Satellite::tempInRange() {
 	return (tempRawValue > tempLowLimit && tempRawValue < tempHighLimit);
