@@ -252,7 +252,7 @@ void loop(void) {
 			
 			update(received); // Update the relevant Satellite object with the new values
 			
-      printf("%i;", received.xmitterID); // Output CSV with ID,
+      printf("DAT;%i;", received.xmitterID); // Output CSV with ID,
       printf("%lu;", (millis() / 1000)); // timestamp (seconds since base start),
       received.printCSV(); // and values.
   	  satellites[received.xmitterID].lastTransmission = millis(); // Update time record of most recent  transmission for deadman purposes.
