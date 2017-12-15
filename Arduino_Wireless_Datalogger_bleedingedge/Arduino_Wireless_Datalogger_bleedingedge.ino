@@ -51,31 +51,24 @@ const char* role_friendly_name[] = {"invalid", "base", "satellite"};
 int deviceID = -1;
 role_e role = role_base;
 
-	//// Process devices that have just changed status (by generating STS transmissions to GUI).
-void checkDeviceStatus(int deviceID) {
+	//// Check for new device time-outs and send failure any failure status to gui.
+void checkDeviceTimeout(int deviceID, bool &deviceStatusUnknown) {
 	bool wasLive = satellites[deviceID].deviceUp;
-      
-			if (deviceFailure(deviceID)) { //Check for devices that haven't touched base recently.  If such exists,
-				if (wasLive) {
-					printf("STS;%i;0;%lu\n", deviceID, (millis() / 1000));
-				}
-			 else {
-				//printf("Device still down.\n");
-			 }
-			}
-			else {
-				if (!wasLive) {
-					printf("STS;%i;1;%lu\n", deviceID, (millis() / 1000));
-				}
-				else {
-					//printf("Device still up.\n");
-				}
-			}
+
+	if (deviceFailure(deviceID)) { //Check for devices that haven't touched base recently.  If such exists,
+		if (wasLive || deviceStatusUnknown) {  // If state has changed, or satellite hasn't checked in in the first DEADMANPERIOD of runtime
+			printf("STS;%i;0;%lu\n", deviceID, (millis() / 1000)); // Set device status DOWN.
+     deviceStatusUnknown = false;
+		}
+    else {
+		  //printf("Device still down.\n");
+	  }
+	}
 }
 
 	//// Has particular Satellite gone >DEADMANPERIOD without checking in?
 bool deviceFailure(int deviceID) {
-  
+
     if (static_cast<unsigned long int>(millis() - satellites[deviceID].lastTransmission) > DEADMANPERIOD && millis() > SATELLITELOOPPERIOD) { 
       satellites[deviceID].deviceUp = false;
     }
@@ -161,7 +154,8 @@ void setup(void) {
 
 
 void loop(void) {
-  
+
+   //// Satellite role; Field devicess collecting data for transmission to base.
   if (role == role_satellite) {  //Satellite setup
     long long unsigned int lastSensorPoll = 0;
     double temp_act = 0.0, hum_act = 0.0;
@@ -237,39 +231,52 @@ void loop(void) {
 
   //// Base role; Device connected to computer to receive transmissions from the satellite
   if (role == role_base) {
-   
-    Transmission received(-1, 0.0,0.0);
-		
-			//// Check each device's status
-    for (int i = 1; i <= SATELLITES; i++) {
-			checkDeviceStatus(i);
-	  }
-  
-			//// Process incoming Transmissions
-    if (radio.available()) { // If an incoming transmission is pending
-        
-      radio.read(&received, sizeof(received)); // Read it
-			
-			update(received); // Update the relevant Satellite object with the new values
-			
-      printf("DAT;%i;", received.xmitterID); // Output CSV with ID,
-      printf("%lu;", (millis() / 1000)); // timestamp (seconds since base start),
-      received.printCSV(); // and values.
-  	  satellites[received.xmitterID].lastTransmission = millis(); // Update time record of most recent  transmission for deadman purposes.
 
-      //printf("low hlim is %i, hum is %i, first OOR on %lu, current time elapsed %lu, grace period is %lu, alarm condition is %i, alarm status is %i\n", satellites[received.xmitterID].humLowLimit, satellites[received.xmitterID].humRawValue, satellites[received.xmitterID].humFirstOOR, satellites[received.xmitterID].lastTransmission, satellites[received.xmitterID].humAlarmGracePeriod, ((satellites[received.xmitterID].lastTransmission - satellites[received.xmitterID].humFirstOOR) > satellites[received.xmitterID].humAlarmGracePeriod), satellites[received.xmitterID].humLowAlarm);
-  
-				//// Temporary alarm processing
-      if (satellites[received.xmitterID].tempLowAlarm || 
-         satellites[received.xmitterID].tempHighAlarm || 
-          satellites[received.xmitterID].humLowAlarm || 
-          satellites[received.xmitterID].humHighAlarm){
-        printf("Alarm Condition!\nAutoClearing alarms until GUI is ready.\n");
-        satellites[received.xmitterID].clearAlarms(); // Necessary until GUI is able to command base
-      }
+    bool deviceStatusUnknown[DEVICES]; // Tracks whether we've determined a device status of a particular satellite since bas boot
+    for (int i = 1; i <= SATELLITES; i++) {deviceStatusUnknown[i] = true;}
+    
+    
+    while (role == role_base) {
+     
+      Transmission received(-1, 0.0,0.0);
+  		
+  			//// Check each device's status
+      for (int i = 1; i <= SATELLITES; i++) {
+  			checkDeviceTimeout(i, deviceStatusUnknown[i]);
+  	  }
+    
+  			//// Process incoming Transmissions
+      if (radio.available()) { // If an incoming transmission is pending
+          
+        radio.read(&received, sizeof(received)); // Read it
         
+        if (satellites[received.xmitterID].deviceUp == false || deviceStatusUnknown[received.xmitterID]) {
+          printf("STS;%i;1;%lu\n", received.xmitterID, (millis() / 1000));
+          deviceStatusUnknown[received.xmitterID] = false;
+        }
+        satellites[received.xmitterID].deviceUp = true;
+        satellites[received.xmitterID].lastTransmission = millis(); // Update time record of most recent  transmission for deadman purposes.
+  			
+  			update(received); // Update the relevant Satellite object with the new values
+  			
+        printf("DAT;%i;", received.xmitterID); // Output CSV with ID,
+        printf("%lu;", (millis() / 1000)); // timestamp (seconds since base boot),
+        received.printCSV(); // and values.
+  
+        //printf("low hlim is %i, hum is %i, first OOR on %lu, current time elapsed %lu, grace period is %lu, alarm condition is %i, alarm status is %i\n", satellites[received.xmitterID].humLowLimit, satellites[received.xmitterID].humRawValue, satellites[received.xmitterID].humFirstOOR, satellites[received.xmitterID].lastTransmission, satellites[received.xmitterID].humAlarmGracePeriod, ((satellites[received.xmitterID].lastTransmission - satellites[received.xmitterID].humFirstOOR) > satellites[received.xmitterID].humAlarmGracePeriod), satellites[received.xmitterID].humLowAlarm);
+    
+  				//// Temporary alarm processing
+        if (satellites[received.xmitterID].tempLowAlarm || 
+           satellites[received.xmitterID].tempHighAlarm || 
+            satellites[received.xmitterID].humLowAlarm || 
+            satellites[received.xmitterID].humHighAlarm){
+          printf("Alarm Condition!\nAutoClearing alarms until GUI is ready.\n");
+          satellites[received.xmitterID].clearAlarms(); // Necessary until GUI is able to command base
+        }
+          
+      }
+  			////Delay to allow satellite to switch to receive mode (currently not useful).
+      delay(20);
     }
-			////Delay to allow satellite to switch to receive mode (currently not useful).
-    delay(20);
   }
 }

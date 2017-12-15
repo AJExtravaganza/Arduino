@@ -1,6 +1,6 @@
 #include "Satellite.h"
 
-Satellite::Satellite() : deviceID(-1), deviceUp(true), lastTransmission(0UL), 
+Satellite::Satellite() : deviceID(-1), deviceUp(false), lastTransmission(0UL), 
 	tempRawValue(-1), humRawValue(-1), 
 	tempHighLimit(TEMPHIGHLIMIT), tempLowLimit(TEMPLOWLIMIT), tempHighAlarm(false), tempLowAlarm(false), 
 	tempFirstOOR(0UL), tempAlarmGracePeriod(TEMPALARMGRACEPERIOD),
@@ -11,7 +11,7 @@ Satellite::Satellite() : deviceID(-1), deviceUp(true), lastTransmission(0UL),
 }
 
 Satellite::Satellite(int deviceID, unsigned long int tGrace, int tHigh, int tLow, unsigned long int hGrace, int hHigh, int hLow) : 
-	deviceID(deviceID), deviceUp(true), lastTransmission(0UL), 
+	deviceID(deviceID), deviceUp(false), lastTransmission(0UL), 
 	tempRawValue(-1), humRawValue(-1), 
 	tempHighLimit(TEMPHIGHLIMIT), tempLowLimit(TEMPLOWLIMIT), tempHighAlarm(false), tempLowAlarm(false), 
 	tempFirstOOR(0UL), tempAlarmGracePeriod(TEMPALARMGRACEPERIOD),
