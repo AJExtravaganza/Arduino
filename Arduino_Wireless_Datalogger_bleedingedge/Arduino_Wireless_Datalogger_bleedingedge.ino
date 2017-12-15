@@ -247,7 +247,7 @@ void loop(void) {
     
   			//// Process incoming Transmissions
       if (radio.available()) { // If an incoming transmission is pending
-          
+        
         radio.read(&received, sizeof(received)); // Read it
         
         if (satellites[received.xmitterID].deviceUp == false || deviceStatusUnknown[received.xmitterID]) {
@@ -264,16 +264,19 @@ void loop(void) {
         printf(">DAT;%i;", received.xmitterID); // Output CSV with ID,
         printf("%lu;", (millis() / 1000)); // timestamp (seconds since base boot),
         received.printCSV(); // and values.
-  
-        //printf("low hlim is %i, hum is %i, first OOR on %lu, current time elapsed %lu, grace period is %lu, alarm condition is %i, alarm status is %i\n", satellites[received.xmitterID].humLowLimit, satellites[received.xmitterID].humRawValue, satellites[received.xmitterID].humFirstOOR, satellites[received.xmitterID].lastTransmission, satellites[received.xmitterID].humAlarmGracePeriod, ((satellites[received.xmitterID].lastTransmission - satellites[received.xmitterID].humFirstOOR) > satellites[received.xmitterID].humAlarmGracePeriod), satellites[received.xmitterID].humLowAlarm);
-    
-  				//// Temporary alarm processing
-        if (satellites[received.xmitterID].tempLowAlarm || 
-           satellites[received.xmitterID].tempHighAlarm || 
-            satellites[received.xmitterID].humLowAlarm || 
-            satellites[received.xmitterID].humHighAlarm){
-          printf("Alarm Condition!\nAutoClearing alarms until GUI is ready.\n");
-          satellites[received.xmitterID].clearAlarms(); // Necessary until GUI is able to command base
+
+          ////Basic alarm reporting functionality
+        if (satellites[received.xmitterID].tempLowAlarm) {
+          printf(">ALM;%i;Low Temperature;\n", received.xmitterID);
+        }
+        if (satellites[received.xmitterID].tempHighAlarm) {
+          printf(">ALM;%i;High Temperature;\n", received.xmitterID);
+        }
+        if (satellites[received.xmitterID].humLowAlarm) {
+          printf(">ALM;%i;Low Humidity;\n", received.xmitterID);
+        }
+        if (satellites[received.xmitterID].humHighAlarm) {
+          printf(">ALM;%i;High Humidity;\n", received.xmitterID);
         }
           
       }
