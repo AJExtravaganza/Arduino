@@ -251,15 +251,17 @@ void loop(void) {
         radio.read(&received, sizeof(received)); // Read it
         
         if (satellites[received.xmitterID].deviceUp == false || deviceStatusUnknown[received.xmitterID]) {
-          printf("STS;%i;1;%lu\n", received.xmitterID, (millis() / 1000));
+          printf(">STS;%i;1;%lu;\n", received.xmitterID, (millis() / 1000));
+          delay(5); // To let GUI serial interface catch up before next transmission.
           deviceStatusUnknown[received.xmitterID] = false;
+          
         }
         satellites[received.xmitterID].deviceUp = true;
         satellites[received.xmitterID].lastTransmission = millis(); // Update time record of most recent  transmission for deadman purposes.
   			
   			update(received); // Update the relevant Satellite object with the new values
   			
-        printf("DAT;%i;", received.xmitterID); // Output CSV with ID,
+        printf(">DAT;%i;", received.xmitterID); // Output CSV with ID,
         printf("%lu;", (millis() / 1000)); // timestamp (seconds since base boot),
         received.printCSV(); // and values.
   
