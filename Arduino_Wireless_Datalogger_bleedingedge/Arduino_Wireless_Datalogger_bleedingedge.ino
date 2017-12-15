@@ -252,7 +252,7 @@ void loop(void) {
         
         if (satellites[received.xmitterID].deviceUp == false || deviceStatusUnknown[received.xmitterID]) {
           printf(">STS;%i;1;%lu;\n", received.xmitterID, (millis() / 1000));
-          delay(5); // To let GUI serial interface catch up before next transmission.
+          //delay(5); // To let GUI serial interface catch up before next transmission. (No longer required due to improved parsing format)
           deviceStatusUnknown[received.xmitterID] = false;
           
         }
