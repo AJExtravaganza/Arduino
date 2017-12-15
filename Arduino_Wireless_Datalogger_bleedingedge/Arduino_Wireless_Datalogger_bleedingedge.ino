@@ -57,7 +57,7 @@ void checkDeviceTimeout(int deviceID, bool &deviceStatusUnknown) {
 
 	if (deviceFailure(deviceID)) { //Check for devices that haven't touched base recently.  If such exists,
 		if (wasLive || deviceStatusUnknown) {  // If state has changed, or satellite hasn't checked in in the first DEADMANPERIOD of runtime
-			printf("STS;%i;0;%lu\n", deviceID, (millis() / 1000)); // Set device status DOWN.
+			printf(">STS;%i;0;%lu\n", deviceID, (millis() / 1000)); // Set device status DOWN.
      deviceStatusUnknown = false;
 		}
     else {
