@@ -16,4 +16,3 @@ FAQ
 *.xslt
 .idea/
 cmake-build-debug/
-util*
