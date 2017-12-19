@@ -19,7 +19,7 @@ const unsigned long int CHECKINPERIOD = 1000UL *  10UL;// * 60UL * 15UL; // Chec
 const int DEADMANTHRESHOLD = 10; //Exceeding CHECKINPERIOD by 10% will cause deadman alarm
 
 	//// Hysteresis values in deci-units
-const float TEMPHYS = 5;  
+const float TEMPHYS = 1;  
 const float HUMHYS = 5; 
 
   ////These are Tingle's magic derived constants.  Do not touch them.////
