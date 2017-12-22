@@ -66,6 +66,12 @@ void checkDeviceTimeout(int deviceID, bool &deviceStatusUnknown) {
 	}
 }
 
+void clearAllAlarms() {
+  for (int i = 1; i < DEVICES; i++) {
+    satellites[i].clearAlarms();
+  }
+}
+
 	//// Has particular Satellite gone >DEADMANPERIOD without checking in?
 bool deviceFailure(int deviceID) {
 
@@ -278,6 +284,8 @@ void loop(void) {
         if (satellites[received.xmitterID].humHighAlarm) {
           printf(">ALM;%i;High Humidity;\n", received.xmitterID);
         }
+
+        clearAllAlarms(); // Necessary until gui is able to xmit a command to base.  Does not reset FirstOOR timers
           
       }
   			////Delay to allow satellite to switch to receive mode (currently not useful).
