@@ -10,7 +10,7 @@
 #include "BME280.h"
 
 
-const unsigned int SATELLITES = 1;
+const unsigned int SATELLITES = 2;
 const unsigned int DEVICES = SATELLITES + 1;
 unsigned long int lastCheckedIn = 0; // Holds last time satellite contacted base (by successfully sending a transmission)  Used by sats only.
 
@@ -141,7 +141,7 @@ void setup(void) {
   readTrim();
 
   printf_begin();
-  //printf("ROLE: %s with ID %i\n\r", role_friendly_name[role], settings.deviceID);
+  printf("ROLE: %s with ID %i\n\r", role_friendly_name[role], settings.deviceID);
 
 		////Radio Configuration
   radio.begin();
@@ -227,6 +227,7 @@ void loop(void) {
             
             delivered = radio.write(&latest, sizeof(latest)); //Assigns true if transmission is successfully received by base
             if (delivered) {
+              beep(); //for comms debugging
               printf("Delivered (%i attempts)...\n", attempt);
               prevPayload = latest; //Update record of last transmission successfully sent
 			        lastCheckedIn = millis(); //Update record of last check-in with base
