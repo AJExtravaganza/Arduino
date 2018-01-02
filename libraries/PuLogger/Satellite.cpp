@@ -59,7 +59,7 @@ void Satellite::procAlarms(unsigned long int currentTimeElapsed) {
 		if (!tempFirstOOR) {
 			tempFirstOOR = currentTimeElapsed;
 		}
-		else if ((currentTimeElapsed - tempFirstOOR) > tempAlarmGracePeriod) {
+		else if ((currentTimeElapsed - tempFirstOOR) > tempAlarmGracePeriod || true ) { //really, temp should never be too high
 			tempHighAlarm = true;
 		}
 		else {} 
@@ -87,7 +87,7 @@ void Satellite::procAlarms(unsigned long int currentTimeElapsed) {
 		if (!humFirstOOR) {
 			humFirstOOR = currentTimeElapsed;
 		}
-		else if ((currentTimeElapsed - humFirstOOR) > humAlarmGracePeriod) {
+		else if ((currentTimeElapsed - humFirstOOR) > humAlarmGracePeriod || true ) { //really, temp should never be too high)
 			humHighAlarm = true;
 		}
 		else {}

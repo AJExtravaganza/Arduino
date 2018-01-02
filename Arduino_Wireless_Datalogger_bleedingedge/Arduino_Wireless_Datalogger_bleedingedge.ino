@@ -51,8 +51,18 @@ const char* role_friendly_name[] = {"invalid", "base", "satellite"};
 int deviceID = -1;
 role_e role = role_base;
 
+void setBuzzer(bool state) {
+  digitalWrite(2,(state ? HIGH : LOW));
+}
+
+void beep() {
+  setBuzzer(true);
+  delay(20);
+  setBuzzer(false);
+}
+
 	//// Check for new device time-outs and send failure any failure status to gui.
-void checkDeviceTimeout(int deviceID, bool &deviceStatusUnknown) {
+bool checkDeviceTimeout(int deviceID, bool &deviceStatusUnknown) {
 	bool wasLive = satellites[deviceID].deviceUp;
 
 	if (deviceFailure(deviceID)) { //Check for devices that haven't touched base recently.  If such exists,
@@ -63,6 +73,8 @@ void checkDeviceTimeout(int deviceID, bool &deviceStatusUnknown) {
     else {
 		  //printf("Device still down.\n");
 	  }
+   
+    beep();
 	}
 }
 
@@ -92,7 +104,7 @@ void update(Transmission received) {
 
 void setup(void) {
 
-  
+  pinMode(2, OUTPUT);
   
 		//// Start the serial service.
   Serial.begin(57600);
@@ -158,6 +170,8 @@ void setup(void) {
 
   //Commented out for Qt QString compatibility, which can't handle tabs in QString.left()
   //radio.printDetails(); //Outputs detailed information on radio unit and settings
+
+  beep(); // Indicate successful startup (ie no serial lockup)
 }
 
 
@@ -240,17 +254,21 @@ void loop(void) {
   //// Base role; Device connected to computer to receive transmissions from the satellite
   if (role == role_base) {
 
+    
+
     bool deviceStatusUnknown[DEVICES]; // Tracks whether we've determined a device status of a particular satellite since bas boot
     for (int i = 1; i <= SATELLITES; i++) {deviceStatusUnknown[i] = true;}
     
     
     while (role == role_base) {
-     
+           
       Transmission received(-1, 0.0,0.0);
   		
   			//// Check each device's status
       for (int i = 1; i <= SATELLITES; i++) {
-  			checkDeviceTimeout(i, deviceStatusUnknown[i]);
+  			if (checkDeviceTimeout(i, deviceStatusUnknown[i])) {
+          beep();
+  			}
   	  }
     
   			//// Process incoming Transmissions
@@ -276,15 +294,19 @@ void loop(void) {
           ////Basic alarm reporting functionality
         if (satellites[received.xmitterID].tempLowAlarm) {
           printf(">ALM;%i;LT;Low Temperature;\n", received.xmitterID);
+          beep();
         }
         if (satellites[received.xmitterID].tempHighAlarm) {
           printf(">ALM;%i;HT;High Temperature;\n", received.xmitterID);
+          beep();
         }
         if (satellites[received.xmitterID].humLowAlarm) {
           printf(">ALM;%i;LH;Low Humidity;\n", received.xmitterID);
+          beep();
         }
         if (satellites[received.xmitterID].humHighAlarm) {
           printf(">ALM;%i;HH;High Humidity;\n", received.xmitterID);
+          beep();
         }
 
         clearAllAlarms(); // Necessary until gui is able to xmit a command to base.  Does not reset FirstOOR timers
