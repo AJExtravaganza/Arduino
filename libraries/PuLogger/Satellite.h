@@ -6,8 +6,8 @@ const int TEMPHIGHLIMIT = 310;
 const int TEMPLOWLIMIT = 270;
 const int HUMHIGHLIMIT = 750;
 const int HUMLOWLIMIT = 650;
-const unsigned long int TEMPALARMGRACEPERIOD = (1000UL * 10UL);// 60UL * 60UL); //1 hour
-const unsigned long int HUMALARMGRACEPERIOD = (1000UL * 10UL);//60UL * 60UL); //1 hour
+const unsigned long int TEMPALARMGRACEPERIOD = (1000UL *  60UL * 60UL); //1 hour
+const unsigned long int HUMALARMGRACEPERIOD = (1000UL * 60UL * 60UL); //1 hour
 
 
 class Satellite { //privatise whatever when you have a final architecture figured out.

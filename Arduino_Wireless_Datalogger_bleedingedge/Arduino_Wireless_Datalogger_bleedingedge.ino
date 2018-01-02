@@ -91,7 +91,9 @@ void update(Transmission received) {
 }
 
 void setup(void) {
-	
+
+  
+  
 		//// Start the serial service.
   Serial.begin(57600);
 
@@ -273,16 +275,16 @@ void loop(void) {
 
           ////Basic alarm reporting functionality
         if (satellites[received.xmitterID].tempLowAlarm) {
-          printf(">ALM;%i;Low Temperature;\n", received.xmitterID);
+          printf(">ALM;%i;LT;Low Temperature;\n", received.xmitterID);
         }
         if (satellites[received.xmitterID].tempHighAlarm) {
-          printf(">ALM;%i;High Temperature;\n", received.xmitterID);
+          printf(">ALM;%i;HT;High Temperature;\n", received.xmitterID);
         }
         if (satellites[received.xmitterID].humLowAlarm) {
-          printf(">ALM;%i;Low Humidity;\n", received.xmitterID);
+          printf(">ALM;%i;LH;Low Humidity;\n", received.xmitterID);
         }
         if (satellites[received.xmitterID].humHighAlarm) {
-          printf(">ALM;%i;High Humidity;\n", received.xmitterID);
+          printf(">ALM;%i;HH;High Humidity;\n", received.xmitterID);
         }
 
         clearAllAlarms(); // Necessary until gui is able to xmit a command to base.  Does not reset FirstOOR timers
