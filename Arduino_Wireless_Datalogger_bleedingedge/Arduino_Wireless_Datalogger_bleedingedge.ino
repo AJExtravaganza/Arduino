@@ -10,7 +10,7 @@
 #include "BME280.h"
 
 
-const unsigned int SATELLITES = 2;
+const unsigned int SATELLITES = 1;
 const unsigned int DEVICES = SATELLITES + 1;
 unsigned long int lastCheckedIn = 0; // Holds last time satellite contacted base (by successfully sending a transmission)  Used by sats only.
 
@@ -159,10 +159,11 @@ void setup(void) {
 
 		//// Open pipes for Transmission send/receive
   if (role == role_base) {
-    radio.openReadingPipe(1, pipes[0]); //Open channel to receive comms from all satellites
+    radio.openReadingPipe(0, pipes[0]); //Open channel to receive comms from all satellites
   }
   else {
     radio.openWritingPipe(pipes[0]); //All satellites send data to base on channel 0
+    radio.openReadingPipe(1, pipes[0]); //Monitor base rx channel to check it's ok to tx
     radio.openReadingPipe(1, pipes[deviceID]); //Each satellite listens for commands on its matching channel
   }
 
@@ -220,12 +221,19 @@ void loop(void) {
           bool delivered = false;
           
           for (int attempt = 1; !delivered && attempt <= 50; ) {
+            
+            //check for pending tx from other device and wait, if necessary
+            while (radio.available(0)) {
+              //do nothing.
+            }
+
+            //once channel is free, commence transmission
             radio.stopListening(); //Pause listening to enable transmitting
              
             printf("Now sending ");
             latest.printCSV(); //Print a summary of the transmission being sent.
             
-            delivered = radio.write(&latest, sizeof(latest)); //Assigns true if transmission is successfully received by base
+            delivered = radio.write(&latest, sizeof(latest)); //Assigns true if transmission is successfully received by base (or erroneously by another device)
             if (delivered) {
               beep(); //for comms debugging
               printf("Delivered (%i attempts)...\n", attempt);
@@ -236,7 +244,7 @@ void loop(void) {
               printf("failed.\n\r");
               delay(13); //Hacky attempt to get out of what may be an ACK/comms-lock
             }
-
+            
             radio.startListening();
           }
           
@@ -279,7 +287,6 @@ void loop(void) {
         
         if (satellites[received.xmitterID].deviceUp == false || deviceStatusUnknown[received.xmitterID]) {
           printf(">STS;%i;1;%lu;\n", received.xmitterID, (millis() / 1000));
-          //delay(5); // To let GUI serial interface catch up before next transmission. (No longer required due to improved parsing format)
           deviceStatusUnknown[received.xmitterID] = false;
           
         }
