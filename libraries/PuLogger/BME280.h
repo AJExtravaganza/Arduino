@@ -1,7 +1,7 @@
 #ifndef BME280
 #define BME280
 
-#define BME280_ADDRESS 0x76
+//#define BME280_ADDRESS 0x77
 unsigned long int hum_raw, temp_raw, pres_raw;
 signed long int t_fine;
 
@@ -24,28 +24,30 @@ int16_t dig_H4;
 int16_t dig_H5;
 int8_t dig_H6;
 
-void readTrim() {
+const int8_t BME280_ADDRESS = 0x77;
+
+void readTrim(int8_t sensorAddress) {
   uint8_t data[32], i = 0;
-  Wire.beginTransmission(BME280_ADDRESS);
+  Wire.beginTransmission(sensorAddress);
   Wire.write(0x88);
   Wire.endTransmission();
-  Wire.requestFrom(BME280_ADDRESS, 24);
+  Wire.requestFrom(sensorAddress, 24);
   while (Wire.available()) {
     data[i] = Wire.read();
     i++;
   }
 
-  Wire.beginTransmission(BME280_ADDRESS);
+  Wire.beginTransmission(sensorAddress);
   Wire.write(0xA1);
   Wire.endTransmission();
-  Wire.requestFrom(BME280_ADDRESS, 1);
+  Wire.requestFrom(sensorAddress, 1);
   data[i] = Wire.read();
   i++;
 
-  Wire.beginTransmission(BME280_ADDRESS);
+  Wire.beginTransmission(sensorAddress);
   Wire.write(0xE1);
   Wire.endTransmission();
-  Wire.requestFrom(BME280_ADDRESS, 7);
+  Wire.requestFrom(sensorAddress, 7);
   while (Wire.available()) {
     data[i] = Wire.read();
     i++;
@@ -70,21 +72,21 @@ void readTrim() {
   dig_H6 = data[31];
 }
 
-void writeReg(uint8_t reg_address, uint8_t data) {
-  Wire.beginTransmission(BME280_ADDRESS);
+void writeReg(uint8_t reg_address, uint8_t data, int8_t sensorAddress) {
+  Wire.beginTransmission(sensorAddress);
   Wire.write(reg_address);
   Wire.write(data);
   Wire.endTransmission();
 }
 
 
-void readData() {
+void readData(int8_t sensorAddress) {
   int i = 0;
   uint32_t data[8];
-  Wire.beginTransmission(BME280_ADDRESS);
+  Wire.beginTransmission(sensorAddress);
   Wire.write(0xF7);
   Wire.endTransmission();
-  Wire.requestFrom(BME280_ADDRESS, 8);
+  Wire.requestFrom(sensorAddress, 8);
   while (Wire.available()) {
     data[i] = Wire.read();
     i++;

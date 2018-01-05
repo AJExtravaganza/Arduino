@@ -27,6 +27,9 @@ const unsigned long int DEADMANPERIOD = CHECKINPERIOD * (100UL + static_cast<uns
 const unsigned long int SENSORPOLLPERIOD = CHECKINPERIOD / 10UL - 1UL; //Must be <DEADMANTHRESHOLD% of DEADMANPERIOD
 const unsigned long int SATELLITELOOPPERIOD = SENSORPOLLPERIOD / 3UL; // Must be <=SENSORPOLLPERIOD
 
+  //// Global variable to store address of current sensor to poll
+uint8_t activeSensorAddress = 0x00;
+
 	////Satellite objects for base station
 Satellite satellites[DEVICES];
 
@@ -120,7 +123,10 @@ void setup(void) {
   deviceID = settings.deviceID;
   role = settings.deviceID == 0 ? role_base : role_satellite;
   
-  //// BME280 and SPI Setup
+  //// BME280 and I2C Setup
+
+  activeSensorAddress = 0x77; // Default BME280 addresses are 0x76, or 0x77 if jumper has been set.
+  
   uint8_t osrs_t = 1;             //Temperature oversampling x 1
   uint8_t osrs_p = 1;             //Pressure oversampling x 1
   uint8_t osrs_h = 1;             //Humidity oversampling x 1
@@ -135,10 +141,10 @@ void setup(void) {
 
   Wire.begin();
 
-  writeReg(0xF2, ctrl_hum_reg);
-  writeReg(0xF4, ctrl_meas_reg);
-  writeReg(0xF5, config_reg);
-  readTrim();
+  writeReg(0xF2, ctrl_hum_reg, activeSensorAddress);
+  writeReg(0xF4, ctrl_meas_reg, activeSensorAddress);
+  writeReg(0xF5, config_reg, activeSensorAddress);
+  readTrim(activeSensorAddress);
 
   printf_begin();
   printf("ROLE: %s with ID %i\n\r", role_friendly_name[role], settings.deviceID);
@@ -186,7 +192,7 @@ void loop(void) {
     unsigned long int hum_cal;
     Transmission prevPayload(-1, 0.0, 0.0);
 
-    readData();
+    readData(activeSensorAddress);
 
     temp_cal = calibration_T(temp_raw);
     hum_cal = calibration_H(hum_raw);
@@ -202,7 +208,7 @@ void loop(void) {
         lastSensorPoll = millis();
         
         // Read the temp and humidity, and send two packets of type double whenever the change is sufficient.
-        readData();
+        readData(activeSensorAddress);
   
         temp_cal = calibration_T(temp_raw); //Get raw values from BME280
         hum_cal = calibration_H(hum_raw);
