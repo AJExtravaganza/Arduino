@@ -1,7 +1,7 @@
 #include "Satellite.h"
 
-Satellite::Satellite() : deviceID(-1), deviceUp(false), lastTransmission(0UL), 
-	tempRawValue(-1), humRawValue(-1), 
+Satellite::Satellite() : deviceID(-1), hasAdditionalSensor(false) deviceUp(false), lastTransmission(0UL), 
+	tempRawValue({-1,-1}), humRawValue({-1,-1}), tempRawAvg(-1), humRawAvg(-1)
 	tempHighLimit(TEMPHIGHLIMIT), tempLowLimit(TEMPLOWLIMIT), tempHighAlarm(false), tempLowAlarm(false), 
 	tempFirstOOR(0UL), tempAlarmGracePeriod(TEMPALARMGRACEPERIOD),
 	humHighLimit(HUMHIGHLIMIT), humLowLimit(HUMLOWLIMIT), humHighAlarm(false), humLowAlarm(false), 
@@ -10,9 +10,9 @@ Satellite::Satellite() : deviceID(-1), deviceUp(false), lastTransmission(0UL),
 	
 }
 
-Satellite::Satellite(int deviceID, unsigned long int tGrace, int tHigh, int tLow, unsigned long int hGrace, int hHigh, int hLow) : 
-	deviceID(deviceID), deviceUp(false), lastTransmission(0UL), 
-	tempRawValue(-1), humRawValue(-1), 
+Satellite::Satellite(int deviceID, bool hasAdditionalSensor unsigned long int tGrace, int tHigh, int tLow, unsigned long int hGrace, int hHigh, int hLow) : 
+	deviceID(deviceID), hasAdditionalSensor(hasAdditionalSensor) deviceUp(false), lastTransmission(0UL), 
+	tempRawValue({-1,-1}), humRawValue({-1,-1}), tempRawAvg(-1), humRawAvg(-1)
 	tempHighLimit(TEMPHIGHLIMIT), tempLowLimit(TEMPLOWLIMIT), tempHighAlarm(false), tempLowAlarm(false), 
 	tempFirstOOR(0UL), tempAlarmGracePeriod(TEMPALARMGRACEPERIOD),
 	humHighLimit(HUMHIGHLIMIT), humLowLimit(HUMLOWLIMIT), humHighAlarm(false), humLowAlarm(false), 
@@ -22,27 +22,41 @@ Satellite::Satellite(int deviceID, unsigned long int tGrace, int tHigh, int tLow
 }
 
 	//// Update satellite snapshot from relevant fields of a transmission.
-void Satellite::update(int tempRawValue, int humRawValue, unsigned long int currentTimeElapsed) {
-	Satellite::tempRawValue = tempRawValue;
-	Satellite::humRawValue = humRawValue;
+void Satellite::update(int sensor, int tempRawValue, int humRawValue, unsigned long int currentTimeElapsed) {
+	Satellite::tempRawValue[sensor] = tempRawValue;
+	Satellite::humRawValue[sensor] = humRawValue;
+	Satellite::tempRawAvg = (tempRawValue[0] + tempRawValue[1]) / 2; // Updates averages
+	Satellite::humRawAvg = (humRawValue[0] + humRawValue[1]) / 2;
 	Satellite::lastTransmission = currentTimeElapsed;
 	
 	Satellite::procAlarms(currentTimeElapsed);
 }
 	//// Is temperature between the high and low limits?
 bool Satellite::tempInRange() {
-	return (tempRawValue > tempLowLimit && tempRawValue < tempHighLimit);
+	bool inRange = (tempRawValue[0] > tempLowLimit && tempRawValue[0] < tempHighLimit);
+	if (hasAdditionalSensor && inRange) {
+		inRange = (tempRawValue[1] > tempLowLimit && tempRawValue[1] < tempHighLimit);
+	}
+	return inRange;
 }
 
 	//// Is humidity between the high and low limits?
 bool Satellite::humInRange() {
-	return (humRawValue > humLowLimit && humRawValue < humHighLimit);
+	bool inRange = (humRawValue[0] > humLowLimit && humRawValue[0] < humHighLimit);
+	if (hasAdditionalSensor && inRange) {
+		inRange = (humRawValue[1] > humLowLimit && humRawValue[1] < humHighLimit);
+	}
+	return inRange;
 }
 
   //// Check alarm triggers and update alarm status
 void Satellite::procAlarms(unsigned long int currentTimeElapsed) {
+	procAlarms(0, currentTimeElapsed)
+}
 	
-	if (tempRawValue < tempLowLimit) { // If value is out of bounds
+void Satellite::procAlarms(int sensor, unsigned long int currentTimeElapsed) {
+	
+	if (tempRawValue[sensor] < tempLowLimit) { // If value is out of bounds
 		if (!tempFirstOOR) { // If it only just went OOB
 			tempFirstOOR = currentTimeElapsed; // Record grace-period start-time.
 		}
@@ -55,7 +69,7 @@ void Satellite::procAlarms(unsigned long int currentTimeElapsed) {
 		tempFirstOOR = 0UL; // Reset grace period start time to inactive state
 	}
 	
-	if (tempRawValue > tempHighLimit) { // As above
+	if (tempRawValue[sensor] > tempHighLimit) { // As above
 		if (!tempFirstOOR) {
 			tempFirstOOR = currentTimeElapsed;
 		}
@@ -67,10 +81,8 @@ void Satellite::procAlarms(unsigned long int currentTimeElapsed) {
 	else if (tempInRange()){
 		tempFirstOOR = 0UL;
 	}
-
 	
-	
-	if (humRawValue < humLowLimit) { // As above
+	if (humRawValue[sensor] < humLowLimit) { // As above
 		if (humFirstOOR == 0UL) {
 			humFirstOOR = currentTimeElapsed;
 		}
@@ -83,7 +95,7 @@ void Satellite::procAlarms(unsigned long int currentTimeElapsed) {
 		humFirstOOR = 0UL;
 	}
 	
-	if (humRawValue > humHighLimit) { // As above
+	if (humRawValue[sensor] > humHighLimit) { // As above
 		if (!humFirstOOR) {
 			humFirstOOR = currentTimeElapsed;
 		}
@@ -94,6 +106,10 @@ void Satellite::procAlarms(unsigned long int currentTimeElapsed) {
 	}
 	else if (humInRange()){
 		humFirstOOR = 0UL;
+	}
+	
+	if (hasAdditionalSensor) {
+		procAlarms(1, currentTimeElapsed); // Recursive call for second sensor
 	}
 }
 
@@ -108,10 +124,10 @@ void Satellite::clearAlarms() {
 	//humFirstOOR = 0;
 }
 
-float Satellite::getTemp() {
-	return  float(tempRawValue) / 10.0;
+float Satellite::getTemp(int sensor) {
+	return  float(tempRawValue[sensor]) / 10.0;
 }
 
-float Satellite::getHum() {
-	return  float(humRawValue) / 10.0;
+float Satellite::getHum(int sensor) {
+	return  float(humRawValue[sensor]) / 10.0;
 }

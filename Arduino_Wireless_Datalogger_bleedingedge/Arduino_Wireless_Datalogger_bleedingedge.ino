@@ -125,7 +125,7 @@ void setup(void) {
   
   //// BME280 and I2C Setup
 
-  activeSensorAddress = 0x77; // Default BME280 addresses are 0x76, or 0x77 if jumper has been set.
+  activeSensorAddress = 0x76; // Default BME280 addresses are 0x76, or 0x77 if jumper has been set.
   
   uint8_t osrs_t = 1;             //Temperature oversampling x 1
   uint8_t osrs_p = 1;             //Pressure oversampling x 1
