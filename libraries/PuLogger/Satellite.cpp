@@ -1,7 +1,7 @@
 #include "Satellite.h"
 
-Satellite::Satellite() : deviceID(-1), hasAdditionalSensor(false) deviceUp(false), lastTransmission(0UL), 
-	tempRawValue({-1,-1}), humRawValue({-1,-1}), tempRawAvg(-1), humRawAvg(-1)
+Satellite::Satellite() : deviceID(-1), hasAdditionalSensor(false), deviceUp(false), lastTransmission(0UL), 
+	tempRawValue{-1,-1}, humRawValue{-1,-1}, tempRawAvg(-1), humRawAvg(-1),
 	tempHighLimit(TEMPHIGHLIMIT), tempLowLimit(TEMPLOWLIMIT), tempHighAlarm(false), tempLowAlarm(false), 
 	tempFirstOOR(0UL), tempAlarmGracePeriod(TEMPALARMGRACEPERIOD),
 	humHighLimit(HUMHIGHLIMIT), humLowLimit(HUMLOWLIMIT), humHighAlarm(false), humLowAlarm(false), 
@@ -10,9 +10,9 @@ Satellite::Satellite() : deviceID(-1), hasAdditionalSensor(false) deviceUp(false
 	
 }
 
-Satellite::Satellite(int deviceID, bool hasAdditionalSensor unsigned long int tGrace, int tHigh, int tLow, unsigned long int hGrace, int hHigh, int hLow) : 
-	deviceID(deviceID), hasAdditionalSensor(hasAdditionalSensor) deviceUp(false), lastTransmission(0UL), 
-	tempRawValue({-1,-1}), humRawValue({-1,-1}), tempRawAvg(-1), humRawAvg(-1)
+Satellite::Satellite(int deviceID, bool hasAdditionalSensor, unsigned long int tGrace, int tHigh, int tLow, unsigned long int hGrace, int hHigh, int hLow) : 
+	deviceID(deviceID), hasAdditionalSensor(hasAdditionalSensor), deviceUp(false), lastTransmission(0UL), 
+	tempRawValue{-1,-1}, humRawValue{-1,-1}, tempRawAvg(-1), humRawAvg(-1),
 	tempHighLimit(TEMPHIGHLIMIT), tempLowLimit(TEMPLOWLIMIT), tempHighAlarm(false), tempLowAlarm(false), 
 	tempFirstOOR(0UL), tempAlarmGracePeriod(TEMPALARMGRACEPERIOD),
 	humHighLimit(HUMHIGHLIMIT), humLowLimit(HUMLOWLIMIT), humHighAlarm(false), humLowAlarm(false), 
@@ -25,8 +25,8 @@ Satellite::Satellite(int deviceID, bool hasAdditionalSensor unsigned long int tG
 void Satellite::update(int sensor, int tempRawValue, int humRawValue, unsigned long int currentTimeElapsed) {
 	Satellite::tempRawValue[sensor] = tempRawValue;
 	Satellite::humRawValue[sensor] = humRawValue;
-	Satellite::tempRawAvg = (tempRawValue[0] + tempRawValue[1]) / 2; // Updates averages
-	Satellite::humRawAvg = (humRawValue[0] + humRawValue[1]) / 2;
+	Satellite::tempRawAvg = (Satellite::tempRawValue[0] + Satellite::tempRawValue[1]) / 2; // Updates averages
+	Satellite::humRawAvg = (Satellite::humRawValue[0] + Satellite::humRawValue[1]) / 2;
 	Satellite::lastTransmission = currentTimeElapsed;
 	
 	Satellite::procAlarms(currentTimeElapsed);
@@ -51,7 +51,7 @@ bool Satellite::humInRange() {
 
   //// Check alarm triggers and update alarm status
 void Satellite::procAlarms(unsigned long int currentTimeElapsed) {
-	procAlarms(0, currentTimeElapsed)
+	procAlarms(0, currentTimeElapsed);
 }
 	
 void Satellite::procAlarms(int sensor, unsigned long int currentTimeElapsed) {

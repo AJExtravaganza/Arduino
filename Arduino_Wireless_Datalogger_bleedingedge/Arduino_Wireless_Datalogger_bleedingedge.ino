@@ -28,6 +28,7 @@ const unsigned long int SENSORPOLLPERIOD = CHECKINPERIOD / 10UL - 1UL; //Must be
 const unsigned long int SATELLITELOOPPERIOD = SENSORPOLLPERIOD / 3UL; // Must be <=SENSORPOLLPERIOD
 
   //// Global variable to store address of current sensor to poll
+bool hasAdditionalSensor = false;
 uint8_t activeSensorAddress = 0x00;
 
 	////Satellite objects for base station
@@ -102,7 +103,11 @@ bool deviceFailure(int deviceID) {
 
 	//// Translate Transmission data update to raw values
 void update(Transmission received) {
-	satellites[received.xmitterID].update(received.getRawTemp(), received.getRawHum(), millis());
+	satellites[received.xmitterID].update(0, received.getRawTemp(0), received.getRawHum(0), millis());
+
+ if (satellites[received.xmitterID].hasAdditionalSensor) {
+	 satellites[received.xmitterID].update(1, received.getRawTemp(1), received.getRawHum(1), millis());
+ }
 }
 
 void setup(void) {
@@ -116,6 +121,11 @@ void setup(void) {
   for (int i = 1; i <= SATELLITES; i++) { 
     satellites[i].deviceID = i;
   }
+	
+	//fixme set hasAdditionalSensor = true.  later this will be done automatically by checking sensor for valid read values (or stored on eeprom?)
+	if (deviceID == 1) {
+		hasAdditionalSensor = true;
+	}
   
   //// Load settings from EEPROM and assign role
   DeviceSettings settings;
@@ -187,18 +197,21 @@ void loop(void) {
    //// Satellite role; Field devicess collecting data for transmission to base.
   if (role == role_satellite) {  //Satellite setup
     long long unsigned int lastSensorPoll = 0;
-    double temp_act = 0.0, hum_act = 0.0;
+	double temp_act[2] = {0.0, 0.0}, hum_act[2] = {0.0,0.0};
     signed long int temp_cal;
     unsigned long int hum_cal;
     Transmission prevPayload(-1, 0.0, 0.0);
+		for (int i = 0; i <= int(hasAdditionalSensor); i++) {
+			readData(i == 0 ? 0x76 : 0x77);
 
-    readData(activeSensorAddress);
+			temp_cal = calibration_T(temp_raw);
+			hum_cal = calibration_H(hum_raw);
+		}
+    
 
-    temp_cal = calibration_T(temp_raw);
-    hum_cal = calibration_H(hum_raw);
-
-    double del_temp_act = 0; //Change in temperature since last transmission
-    double del_hum_act = 0; //Change in humidity since last transmission
+		//not used
+    //double del_temp_act = 0; //Change in temperature since last transmission
+    //double del_hum_act = 0; //Change in humidity since last transmission
 
     printf("CHECKINPERIOD: %lu, DEADMANPERIOD: %lu\n", CHECKINPERIOD, DEADMANPERIOD);
 
@@ -207,18 +220,22 @@ void loop(void) {
       if ((millis() - lastSensorPoll > SENSORPOLLPERIOD) || millis() < 1000UL) { //If it's time to poll the sensors again
         lastSensorPoll = millis();
         
-        // Read the temp and humidity, and send two packets of type double whenever the change is sufficient.
-        readData(activeSensorAddress);
+        // Read the temp and humidity, and send a Transmission packet whenever the change is sufficient.
+			for (int i = 0; i <= int(hasAdditionalSensor); i++) {
+				readData(i == 0 ? 0x76 : 0x77);
+
+				temp_cal = calibration_T(temp_raw);
+				hum_cal = calibration_H(hum_raw);
+				temp_act[i] = (double) temp_cal / 100.0; //Convert raw values to actual.  use round(value*10)/10(.0?) to get 1dp
+        hum_act[i] = (double) hum_cal / 1024.0;
+			}	
   
-        temp_cal = calibration_T(temp_raw); //Get raw values from BME280
-        hum_cal = calibration_H(hum_raw);
-        temp_act = (double) temp_cal / 100.0; //Convert raw values to actual.  use round(value*10)/10(.0?) to get 1dp
-        hum_act = (double) hum_cal / 1024.0;
+        printf("Just read temp=%i.%i, hum=%i.%i\n and %i.%i,     %i.%i\n", 
+							int(temp_act[0]), int(temp_act[0] * 10) % 10, int(hum_act[0]), int(hum_act[0] * 10) % 10,
+							int(temp_act[1]), int(temp_act[1] * 10) % 10, int(hum_act[1]), int(hum_act[1] * 10) % 10);
   
-        printf("Just read temp=%i.%i, hum=%i.%i\n", int(temp_act), int(temp_act * 10) % 10, int(hum_act),
-               int(hum_act * 10) % 10);
-  
-        Transmission latest(deviceID, temp_act, hum_act); //Create new transmission
+				//Create new transmission
+        Transmission latest(deviceID, temp_act[0], hum_act[0], temp_act[1], hum_act[1]); 
 
         printf("Checking %lu > %lu with SATELLITELOOPPERIOD %lu\n", (millis() - lastCheckedIn), CHECKINPERIOD, SATELLITELOOPPERIOD);
         

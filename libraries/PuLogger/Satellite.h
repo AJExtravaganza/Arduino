@@ -19,7 +19,7 @@ public:
   
 	int deviceID;
 	bool deviceUp;
-	bool hasAdditionalSensor;
+	bool hasAdditionalSensor; //should be const, with getter
 	unsigned long int lastTransmission;
 	
 	int tempRawValue[2]; //Raw values in deci-units.  Room for 
@@ -46,6 +46,7 @@ public:
 	bool tempInRange();
 	bool humInRange();
 	void procAlarms(unsigned long int currentTimeElapsed);
+	void procAlarms(int sensor, unsigned long int currentTimeElapsed);
 	void clearAlarms();
 	
   float getTemp();
