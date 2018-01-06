@@ -34,8 +34,9 @@ uint8_t activeSensorAddress = 0x00;
 	////Satellite objects for base station
 Satellite satellites[DEVICES];
 
-// Set up nRF24L01 radio on SPI bus plus pins 9 & 10 
+// Set up nRF24L01 radio on SPI bus plus pins 9 & 10 with particular payload size
 RF24 radio(9, 10);
+int RADIOPAYLOADSIZE = 10; //Must be >= sizeof(Transmission)
 
 // Radio pipe addresses for 6 nodes to communicate.
 const uint64_t pipes[6] = {0xF0F0F0F0D0LL, 0xF0F0F0F0D1LL, 0xF0F0F0F0D2LL, 0xF0F0F0F0D3LL, 0xF0F0F0F0D4LL, 0xF0F0F0F0D5LL};
@@ -137,7 +138,7 @@ void setup(void) {
   
   //// BME280 and I2C Setup
 
-  activeSensorAddress = 0x76; // Default BME280 addresses are 0x76, or 0x77 if jumper has been set.
+  activeSensorAddress = 0x00; // Default BME280 addresses are 0x76, or 0x77 if jumper has been set.
   
   uint8_t osrs_t = 1;             //Temperature oversampling x 1
   uint8_t osrs_p = 1;             //Pressure oversampling x 1
@@ -168,7 +169,7 @@ void setup(void) {
   radio.setRetries(15, 15);
 
   // optionally, reduce the payload size.  seems to improve reliability
-  radio.setPayloadSize(8);
+  radio.setPayloadSize(RADIOPAYLOADSIZE);
 
   radio.setDataRate(RF24_250KBPS);
   
@@ -232,7 +233,6 @@ void loop(void) {
 				hum_cal = calibration_H(hum_raw);
 				temp_act[i] = temp_cal * 10 / 100; //Convert raw values to actual.  use round(value*10)/10(.0?) to get 1dp
         hum_act[i] =  hum_cal * 10 / 1024;
-        delay(100);
 			}	
   
         printf("Just read temp=%i, hum=%i\n and           %i,     %i\n", 
@@ -293,7 +293,9 @@ void loop(void) {
   //// Base role; Device connected to computer to receive transmissions from the satellite
   if (role == role_base) {
 
-    
+    Transmission test(-1, 0, 0, 0, 0);
+
+    printf("Size of Transmission object is %i compared to maximal nRF24L01+ packet size of %i.\n", sizeof(test), RADIOPAYLOADSIZE);
 
     bool deviceStatusUnknown[DEVICES]; // Tracks whether we've determined a device status of a particular satellite since bas boot
     for (int i = 1; i <= SATELLITES; i++) {
@@ -304,7 +306,7 @@ void loop(void) {
     
     while (role == role_base) {
            
-      Transmission received(-1, 0.0,0.0);
+      Transmission received(-1, 0, 0, 0, 0);
   		
   			//// Check each device's status
       for (int i = 1; i <= SATELLITES; i++) {
@@ -317,6 +319,8 @@ void loop(void) {
       if (radio.available()) { // If an incoming transmission is pending
         
         radio.read(&received, sizeof(received)); // Read it
+        printf("Just received ");
+        received.printCSV();
         
         if (satellites[received.xmitterID].deviceUp == false || deviceStatusUnknown[received.xmitterID]) {
           printf(">STS;%i;1;%lu;\n", received.xmitterID, (millis() / 1000));

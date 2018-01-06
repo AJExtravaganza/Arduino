@@ -24,7 +24,7 @@ int16_t dig_H4;
 int16_t dig_H5;
 int8_t dig_H6;
 
-const int8_t BME280_ADDRESS = 0x77;
+//const int8_t BME280_ADDRESS = 0x77;
 
 void readTrim(int8_t sensorAddress) {
   uint8_t data[32], i = 0;
