@@ -1,6 +1,5 @@
 #include <EEPROM.h>
 #include <Wire.h>
-#include <SPI.h>
 #include "nRF24L01.h"
 #include "RF24.h"
 #include "printf.h"
@@ -29,7 +28,7 @@ const unsigned long int SATELLITELOOPPERIOD = SENSORPOLLPERIOD / 3UL; // Must be
 
   //// Global variable to store address of current sensor to poll
 bool hasAdditionalSensor = true; //fixme change back to false when EEPROM stuff is implemented;
-uint8_t activeSensorAddress = 0x00;
+uint8_t sensorAddress[2] = {0x77, 0x76};
 
 	////Satellite objects for base station
 Satellite satellites[DEVICES];
@@ -105,11 +104,11 @@ void clearAllAlarms() {
 	//// Translate Transmission data update to raw values
 void update(Transmission received) {
 	satellites[received.xmitterID].update(0, received.getRawTemp(0), received.getRawHum(0), millis());
-  printf("updating sensor 0 with %i, %i\n", received.getRawTemp(0), received.getRawHum(0)); //debug
+  //printf("updating sensor 0 with %i, %i\n", received.getRawTemp(0), received.getRawHum(0)); //debug
 
  if (satellites[received.xmitterID].hasAdditionalSensor || true) { //debug forcing conditional for debugging
 	 satellites[received.xmitterID].update(1, received.getRawTemp(1), received.getRawHum(1), millis());
-  printf("updating sensor 1 with %i, %i\n", received.getRawTemp(1), received.getRawHum(1)); //debug
+  //printf("updating sensor 1 with %i, %i\n", received.getRawTemp(1), received.getRawHum(1)); //debug
  }
 }
 
@@ -137,8 +136,6 @@ void setup(void) {
   role = settings.deviceID == 0 ? role_base : role_satellite;
   
   //// BME280 and I2C Setup
-
-  activeSensorAddress = 0x00; // Default BME280 addresses are 0x76, or 0x77 if jumper has been set.
   
   uint8_t osrs_t = 1;             //Temperature oversampling x 1
   uint8_t osrs_p = 1;             //Pressure oversampling x 1
@@ -154,10 +151,17 @@ void setup(void) {
 
   Wire.begin();
 
-  writeReg(0xF2, ctrl_hum_reg, activeSensorAddress);
-  writeReg(0xF4, ctrl_meas_reg, activeSensorAddress);
-  writeReg(0xF5, config_reg, activeSensorAddress);
-  readTrim(activeSensorAddress);
+  writeReg(0xF2, ctrl_hum_reg, sensorAddress[0]);
+  writeReg(0xF4, ctrl_meas_reg, sensorAddress[0]);
+  writeReg(0xF5, config_reg, sensorAddress[0]);
+  readTrim(sensorAddress[0]);
+
+  if (hasAdditionalSensor) {
+    writeReg(0xF2, ctrl_hum_reg, sensorAddress[1]);
+    writeReg(0xF4, ctrl_meas_reg, sensorAddress[1]);
+    writeReg(0xF5, config_reg, sensorAddress[1]);
+    readTrim(sensorAddress[1]);
+  }
 
   printf_begin();
   printf("ROLE: %s with ID %i\n\r", role_friendly_name[role], settings.deviceID);
@@ -208,7 +212,8 @@ void loop(void) {
     Transmission prevPayload(-1, 0.0, 0.0, 0.0, 0.0);
     
 		for (int i = 0; i < sensorCount; i++) {
-			readData(i == 0 ? 0x76 : 0x77);
+			readTrim(sensorAddress[i]);
+			readData(sensorAddress[i]);
 
 			temp_cal = calibration_T(temp_raw);
 			hum_cal = calibration_H(hum_raw);
@@ -223,9 +228,10 @@ void loop(void) {
         
         // Read the temp and humidity, and send a Transmission packet whenever the change is sufficient.
 			for (int i = 0; i < sensorCount; i++) {
-        activeSensorAddress = (i == 0 ? 0x76 : 0x77);
-				printf("Reading sensor %i at address %i\n", i, activeSensorAddress);
-        readData(activeSensorAddress);
+        //SensorAddress = (i == 0 ? 0x76 : 0x77);
+				printf("Reading sensor %i at address %i\n", i, sensorAddress[i]);
+        readTrim(sensorAddress[i]);
+        readData(sensorAddress[i]);
         //DEBUG CODE STUFF
 				//readData(i == 0 ? 0x76 : 0x77);
 
@@ -265,7 +271,7 @@ void loop(void) {
             
             delivered = radio.write(&latest, sizeof(latest)); //Assigns true if transmission is successfully received by base (or erroneously by another device)
             if (delivered) {
-              beep(); //for comms debugging
+              //beep(); //for comms debugging
               printf("Delivered (%i attempts)...\n", attempt);
               prevPayload = latest; //Update record of last transmission successfully sent
 			        lastCheckedIn = millis(); //Update record of last check-in with base
@@ -319,8 +325,8 @@ void loop(void) {
       if (radio.available()) { // If an incoming transmission is pending
         
         radio.read(&received, sizeof(received)); // Read it
-        printf("Just received ");
-        received.printCSV();
+        //printf("Just received ");
+        // received.printCSV();
         
         if (satellites[received.xmitterID].deviceUp == false || deviceStatusUnknown[received.xmitterID]) {
           printf(">STS;%i;1;%lu;\n", received.xmitterID, (millis() / 1000));
