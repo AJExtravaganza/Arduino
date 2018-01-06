@@ -28,7 +28,7 @@ const unsigned long int SENSORPOLLPERIOD = CHECKINPERIOD / 10UL - 1UL; //Must be
 const unsigned long int SATELLITELOOPPERIOD = SENSORPOLLPERIOD / 3UL; // Must be <=SENSORPOLLPERIOD
 
   //// Global variable to store address of current sensor to poll
-bool hasAdditionalSensor = false;
+bool hasAdditionalSensor = true; //fixme change back to false when EEPROM stuff is implemented;
 uint8_t activeSensorAddress = 0x00;
 
 	////Satellite objects for base station
@@ -104,9 +104,11 @@ bool deviceFailure(int deviceID) {
 	//// Translate Transmission data update to raw values
 void update(Transmission received) {
 	satellites[received.xmitterID].update(0, received.getRawTemp(0), received.getRawHum(0), millis());
+  printf("updating sensor 0 with %i, %i\n", received.getRawTemp(0), received.getRawHum(0)); //debug
 
- if (satellites[received.xmitterID].hasAdditionalSensor) {
+ if (satellites[received.xmitterID].hasAdditionalSensor || true) { //debug forcing conditional for debugging
 	 satellites[received.xmitterID].update(1, received.getRawTemp(1), received.getRawHum(1), millis());
+  printf("updating sensor 1 with %i, %i\n", received.getRawTemp(1), received.getRawHum(1)); //debug
  }
 }
 
@@ -196,12 +198,14 @@ void loop(void) {
 
    //// Satellite role; Field devicess collecting data for transmission to base.
   if (role == role_satellite) {  //Satellite setup
+    int sensorCount = hasAdditionalSensor ? 2 : 1;
     long long unsigned int lastSensorPoll = 0;
-	double temp_act[2] = {0.0, 0.0}, hum_act[2] = {0.0,0.0};
+	  double temp_act[2] = {0.0, 0.0}, hum_act[2] = {0.0,0.0};
     signed long int temp_cal;
     unsigned long int hum_cal;
-    Transmission prevPayload(-1, 0.0, 0.0);
-		for (int i = 0; i <= int(hasAdditionalSensor); i++) {
+    Transmission prevPayload(-1, 0.0, 0.0, 0.0, 0.0);
+    
+		for (int i = 0; i < sensorCount; i++) {
 			readData(i == 0 ? 0x76 : 0x77);
 
 			temp_cal = calibration_T(temp_raw);
@@ -221,7 +225,8 @@ void loop(void) {
         lastSensorPoll = millis();
         
         // Read the temp and humidity, and send a Transmission packet whenever the change is sufficient.
-			for (int i = 0; i <= int(hasAdditionalSensor); i++) {
+			for (int i = 0; i < sensorCount; i++) {
+				printf("Reading sensor %i\n", i);
 				readData(i == 0 ? 0x76 : 0x77);
 
 				temp_cal = calibration_T(temp_raw);
@@ -289,7 +294,10 @@ void loop(void) {
     
 
     bool deviceStatusUnknown[DEVICES]; // Tracks whether we've determined a device status of a particular satellite since bas boot
-    for (int i = 1; i <= SATELLITES; i++) {deviceStatusUnknown[i] = true;}
+    for (int i = 1; i <= SATELLITES; i++) {
+      deviceStatusUnknown[i] = true;
+      //satellites[i].hasAdditionalSensor = true; // debug Breaks the DAT xmit... wtf
+      }
     
     
     while (role == role_base) {
