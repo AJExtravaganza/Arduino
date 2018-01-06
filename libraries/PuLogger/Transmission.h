@@ -7,12 +7,12 @@ struct Transmission {
   int humRaw[2] = {0, 0}; // And this also
 	
 	//Constructor for single-sensor satellites
-  Transmission(int xmitterID, double temp, double hum) : xmitterID(xmitterID), tempRaw({int(temp * 100), -1}), humRaw({int(hum * 100), -1}) {
+  Transmission(int xmitterID, int temp, int hum) : xmitterID(xmitterID), tempRaw{temp, -1}, humRaw{hum, -1} {
 		
   }
 	
 	// Constructor for double-sensor satellites
-	Transmission(int xmitterID, double temp_0, double hum_0, double temp_1, double hum_1) : xmitterID(xmitterID), tempRaw({int(temp_0 * 100), int(temp_1 * 100)}), humRaw({int(hum_0 * 100), int(hum_1 * 100)})
+	Transmission(int xmitterID, int temp_0, int hum_0, int temp_1, int hum_1) : xmitterID(xmitterID), tempRaw{temp_0, temp_1}, humRaw{hum_0, hum_1}
 	{
 		
   }

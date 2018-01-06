@@ -65,6 +65,19 @@ void beep() {
   setBuzzer(false);
 }
 
+//// Has particular Satellite gone >DEADMANPERIOD without checking in?
+bool deviceFailure(int deviceID) {
+
+    if (static_cast<unsigned long int>(millis() - satellites[deviceID].lastTransmission) > DEADMANPERIOD && millis() > SATELLITELOOPPERIOD) { 
+      satellites[deviceID].deviceUp = false;
+    }
+    else {
+      satellites[deviceID].deviceUp = true;
+    }
+
+    return !satellites[deviceID].deviceUp;
+}
+
 	//// Check for new device time-outs and send failure any failure status to gui.
 bool checkDeviceTimeout(int deviceID, bool &deviceStatusUnknown) {
 	bool wasLive = satellites[deviceID].deviceUp;
@@ -86,19 +99,6 @@ void clearAllAlarms() {
   for (int i = 1; i < DEVICES; i++) {
     satellites[i].clearAlarms();
   }
-}
-
-	//// Has particular Satellite gone >DEADMANPERIOD without checking in?
-bool deviceFailure(int deviceID) {
-
-    if (static_cast<unsigned long int>(millis() - satellites[deviceID].lastTransmission) > DEADMANPERIOD && millis() > SATELLITELOOPPERIOD) { 
-      satellites[deviceID].deviceUp = false;
-    }
-    else {
-      satellites[deviceID].deviceUp = true;
-    }
-
-  	return !satellites[deviceID].deviceUp;
 }
 
 	//// Translate Transmission data update to raw values
@@ -200,7 +200,8 @@ void loop(void) {
   if (role == role_satellite) {  //Satellite setup
     int sensorCount = hasAdditionalSensor ? 2 : 1;
     long long unsigned int lastSensorPoll = 0;
-	  double temp_act[2] = {0.0, 0.0}, hum_act[2] = {0.0,0.0};
+	  int temp_act[2] = {0.0, 0.0};
+	  int hum_act[2] = {0.0,0.0};
     signed long int temp_cal;
     unsigned long int hum_cal;
     Transmission prevPayload(-1, 0.0, 0.0, 0.0, 0.0);
@@ -211,11 +212,6 @@ void loop(void) {
 			temp_cal = calibration_T(temp_raw);
 			hum_cal = calibration_H(hum_raw);
 		}
-    
-
-		//not used
-    //double del_temp_act = 0; //Change in temperature since last transmission
-    //double del_hum_act = 0; //Change in humidity since last transmission
 
     printf("CHECKINPERIOD: %lu, DEADMANPERIOD: %lu\n", CHECKINPERIOD, DEADMANPERIOD);
 
@@ -226,18 +222,21 @@ void loop(void) {
         
         // Read the temp and humidity, and send a Transmission packet whenever the change is sufficient.
 			for (int i = 0; i < sensorCount; i++) {
-				printf("Reading sensor %i\n", i);
-				readData(i == 0 ? 0x76 : 0x77);
+        activeSensorAddress = (i == 0 ? 0x76 : 0x77);
+				printf("Reading sensor %i at address %i\n", i, activeSensorAddress);
+        readData(activeSensorAddress);
+        //DEBUG CODE STUFF
+				//readData(i == 0 ? 0x76 : 0x77);
 
 				temp_cal = calibration_T(temp_raw);
 				hum_cal = calibration_H(hum_raw);
-				temp_act[i] = (double) temp_cal / 100.0; //Convert raw values to actual.  use round(value*10)/10(.0?) to get 1dp
-        hum_act[i] = (double) hum_cal / 1024.0;
+				temp_act[i] = temp_cal * 10 / 100; //Convert raw values to actual.  use round(value*10)/10(.0?) to get 1dp
+        hum_act[i] =  hum_cal * 10 / 1024;
+        delay(100);
 			}	
   
-        printf("Just read temp=%i.%i, hum=%i.%i\n and %i.%i,     %i.%i\n", 
-							int(temp_act[0]), int(temp_act[0] * 10) % 10, int(hum_act[0]), int(hum_act[0] * 10) % 10,
-							int(temp_act[1]), int(temp_act[1] * 10) % 10, int(hum_act[1]), int(hum_act[1] * 10) % 10);
+        printf("Just read temp=%i, hum=%i\n and           %i,     %i\n", 
+							 temp_act[0], hum_act[0], temp_act[1], hum_act[1]);
   
 				//Create new transmission
         Transmission latest(deviceID, temp_act[0], hum_act[0], temp_act[1], hum_act[1]); 
