@@ -17,11 +17,11 @@ struct Transmission {
 		
   }
 	
-	int getRawTemp(int sensor) {return (tempRaw[sensor] + 5) / 10;}
-	int getRawHum(int sensor) {return (humRaw[sensor] + 5) / 10;}
-  float getTemp(int sensor) { return float(tempRaw[sensor]) / 10.0;}
-  float getHum(int sensor) { return float(humRaw[sensor]) / 10.0;}
-  bool changed( Transmission other, float tempHys, float humHys) {return (abs(getTemp(0) - other.getTemp(0)) > tempHys || abs(getHum(0) - other.getHum(0)) > humHys) || abs(getTemp(1) - other.getTemp(1)) > tempHys || abs(getHum(1) - other.getHum(1)) > humHys; } //change to raw values later?
+	int getRawTemp(int sensor) {return tempRaw[sensor];}
+	int getRawHum(int sensor) {return humRaw[sensor];}
+  //float getTemp(int sensor) { return float(tempRaw[sensor]) / 10.0;}
+  //float getHum(int sensor) { return float(humRaw[sensor]) / 10.0;}
+  bool changed( Transmission other, float tempHys, float humHys) {return (abs(getRawTemp(0) - other.getRawTemp(0)) > tempHys || abs(getRawHum(0) - other.getRawHum(0)) > humHys) || abs(getRawTemp(1) - other.getRawTemp(1)) > tempHys || abs(getRawHum(1) - other.getRawHum(1)) > humHys; } //change to raw values later?
   void printCSV() {
 		printf("%i;%i;%i;%i;\n", int(getRawTemp(0)), int(getRawHum(0)), int(getRawTemp(1)), int(getRawHum(1)));
 	}

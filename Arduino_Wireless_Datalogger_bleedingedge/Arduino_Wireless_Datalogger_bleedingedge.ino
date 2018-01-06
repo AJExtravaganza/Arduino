@@ -241,7 +241,10 @@ void loop(void) {
 				//Create new transmission
         Transmission latest(deviceID, temp_act[0], hum_act[0], temp_act[1], hum_act[1]); 
 
-        printf("Checking %lu > %lu with SATELLITELOOPPERIOD %lu\n", (millis() - lastCheckedIn), CHECKINPERIOD, SATELLITELOOPPERIOD);
+        printf("New xmit is ");
+        latest.printCSV();
+
+        //printf("Checking %lu > %lu with SATELLITELOOPPERIOD %lu\n", (millis() - lastCheckedIn), CHECKINPERIOD, SATELLITELOOPPERIOD);
         
         if (latest.changed(prevPayload, TEMPHYS, HUMHYS) //If new values are sufficiently different
 			      || ((millis() - lastCheckedIn) > CHECKINPERIOD)) { // or it's time to check in with base
