@@ -15,7 +15,7 @@ unsigned long int lastCheckedIn = 0; // Holds last time satellite contacted base
 
   ////Definable variables that determine transmission frequency////
 const unsigned long int CHECKINPERIOD = 1000UL *  10UL;// * 60UL * 15UL; // Check in once every fifteen minutes
-const int DEADMANTHRESHOLD = 10; //Exceeding CHECKINPERIOD by 10% will cause deadman alarm
+const int DEADMANTHRESHOLD = 50; //Exceeding CHECKINPERIOD by 50% will cause deadman alarm
 
 	//// Hysteresis values in deci-units
 const float TEMPHYS = 1;  
@@ -35,7 +35,8 @@ Satellite satellites[DEVICES];
 
 // Set up nRF24L01 radio on SPI bus plus pins 9 & 10 with particular payload size
 RF24 radio(9, 10);
-int RADIOPAYLOADSIZE = 10; //Must be >= sizeof(Transmission)
+const int MAXTRANSMITATTEMPTS = 50;
+const int RADIOPAYLOADSIZE = 10; //Must be >= sizeof(Transmission)
 
 // Radio pipe addresses for 6 nodes to communicate.
 const uint64_t pipes[6] = {0xF0F0F0F0D0LL, 0xF0F0F0F0D1LL, 0xF0F0F0F0D2LL, 0xF0F0F0F0D3LL, 0xF0F0F0F0D4LL, 0xF0F0F0F0D5LL};
@@ -229,7 +230,7 @@ void loop(void) {
         // Read the temp and humidity, and send a Transmission packet whenever the change is sufficient.
 			for (int i = 0; i < sensorCount; i++) {
         //SensorAddress = (i == 0 ? 0x76 : 0x77);
-				printf("Reading sensor %i at address %i\n", i, sensorAddress[i]);
+				//printf("Reading sensor %i at address %i\n", i, sensorAddress[i]);
         readTrim(sensorAddress[i]);
         readData(sensorAddress[i]);
         //DEBUG CODE STUFF
@@ -241,14 +242,14 @@ void loop(void) {
         hum_act[i] =  hum_cal * 10 / 1024;
 			}	
   
-        printf("Just read temp=%i, hum=%i\n and           %i,     %i\n", 
-							 temp_act[0], hum_act[0], temp_act[1], hum_act[1]);
+        //printf("Just read temp=%i, hum=%i\n and           %i,     %i\n", 
+				//			 temp_act[0], hum_act[0], temp_act[1], hum_act[1]);
   
 				//Create new transmission
         Transmission latest(deviceID, temp_act[0], hum_act[0], temp_act[1], hum_act[1]); 
 
-        printf("New xmit is ");
-        latest.printCSV();
+        //printf("New xmit is ");
+        //latest.printCSV();
 
         //printf("Checking %lu > %lu with SATELLITELOOPPERIOD %lu\n", (millis() - lastCheckedIn), CHECKINPERIOD, SATELLITELOOPPERIOD);
         
@@ -256,7 +257,7 @@ void loop(void) {
 			      || ((millis() - lastCheckedIn) > CHECKINPERIOD)) { // or it's time to check in with base
           bool delivered = false;
           
-          for (int attempt = 1; !delivered && attempt <= 50; ) {
+          for (int attempt = 1; !delivered && attempt <= MAXTRANSMITATTEMPTS; attempt++) {
             
             //check for pending tx from other device and wait, if necessary
             while (radio.available(0)) {
@@ -266,7 +267,7 @@ void loop(void) {
             //once channel is free, commence transmission
             radio.stopListening(); //Pause listening to enable transmitting
              
-            printf("Now sending ");
+            printf("(Attempt %i) Now sending ", attempt);
             latest.printCSV(); //Print a summary of the transmission being sent.
             
             delivered = radio.write(&latest, sizeof(latest)); //Assigns true if transmission is successfully received by base (or erroneously by another device)
@@ -277,8 +278,13 @@ void loop(void) {
 			        lastCheckedIn = millis(); //Update record of last check-in with base
             }
             else {
-              printf("failed.\n\r");
+              printf("failed.\n");
               delay(13); //Hacky attempt to get out of what may be an ACK/comms-lock
+              
+              if (attempt == MAXTRANSMITATTEMPTS) {
+                printf("Transmission abandoned\n");
+                beep();
+              }
             }
             
             radio.startListening();
