@@ -2,7 +2,7 @@
 #define SATELLITE
 
 	//// Alarm thresholds are defined here
-const int TEMPHIGHLIMIT = 310;
+const int TEMPHIGHLIMIT = 315;
 const int TEMPLOWLIMIT = 270;
 const int HUMHIGHLIMIT = 750;
 const int HUMLOWLIMIT = 600;

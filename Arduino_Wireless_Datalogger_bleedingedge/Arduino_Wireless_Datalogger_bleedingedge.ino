@@ -7,6 +7,7 @@
 #include "Transmission.h"
 #include "Satellite.h"
 #include "BME280.h"
+#include "mechElec.h"
 
 
 const unsigned int SATELLITES = 1;
@@ -115,7 +116,10 @@ void update(Transmission received) {
 
 void setup(void) {
 
-  pinMode(2, OUTPUT);
+ //// Set buzzer, fan and heater pinModes
+  pinMode(BUZZERPIN, OUTPUT);
+  pinMode(FANPIN, OUTPUT);
+
   
 		//// Start the serial service.
   Serial.begin(57600);
@@ -292,8 +296,15 @@ void loop(void) {
           
 				}
 			}
-          
-        //fixme Remove and test
+        
+        // Drive fans 
+        if (max(hum_act[0], hum_act[1]) < HUMHIGHLIMIT - 15) {
+          startFan();
+        }
+        else if (max(hum_act[0], hum_act[1]) > HUMHIGHLIMIT - 5) {
+          stopFan();
+        }
+        
         delay(SATELLITELOOPPERIOD); // Loop poll rate.  Adjust sensor poll rate later to match to reduce power consumption.
     }
   }
