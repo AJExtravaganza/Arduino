@@ -12,6 +12,7 @@ const unsigned long int TEMPALARMGRACEPERIOD = (1000UL *  60UL * 60UL * 5); //5 
 const unsigned long int HUMALARMGRACEPERIOD = (1000UL * 60UL * 60UL * 2); //2 hours (1hr recovery measured, with 100% tolerance)
 
 
+
 class Satellite { //privatise whatever when you have a final architecture figured out.
 private:
 	
