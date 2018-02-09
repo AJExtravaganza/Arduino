@@ -119,6 +119,7 @@ void setup(void) {
  //// Set buzzer, fan and heater pinModes
   pinMode(BUZZERPIN, OUTPUT);
   pinMode(FANPIN, OUTPUT);
+  pinMode(HEATPIN, OUTPUT);
 
   
 		//// Start the serial service.
@@ -284,7 +285,7 @@ void loop(void) {
             else {
               printf("failed.\n");
               delay(13); //Hacky attempt to get out of what may be an ACK/comms-lock
-              
+               
               if (attempt == MAXTRANSMITATTEMPTS) {
                 printf("Transmission abandoned\n");
                 beep();
@@ -298,11 +299,23 @@ void loop(void) {
 			}
         
         // Drive fans 
-        if (max(hum_act[0], hum_act[1]) < HUMHIGHLIMIT - 15) {
+        if (max(hum_act[0], hum_act[1]) < HUMSP) {
           startFan();
+          printf("Fan Start\n");
         }
-        else if (max(hum_act[0], hum_act[1]) > HUMHIGHLIMIT - 5) {
+        else if (max(hum_act[0], hum_act[1]) >= HUMSP) {
           stopFan();
+          printf("Fan Stop\n");
+        }
+
+        //Drive heater
+        if (max(temp_act[0], temp_act[1]) < TEMPSP) {
+          startHeat();
+          printf("Heat Start\n");
+        }
+        else if (max(temp_act[0], temp_act[1]) >= TEMPHIGHLIMIT) {
+          stopHeat();
+          printf("Heat Stop\n");
         }
         
         delay(SATELLITELOOPPERIOD); // Loop poll rate.  Adjust sensor poll rate later to match to reduce power consumption.

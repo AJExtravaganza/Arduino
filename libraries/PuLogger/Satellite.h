@@ -2,10 +2,12 @@
 #define SATELLITE
 
 	//// Alarm thresholds are defined here
-const int TEMPHIGHLIMIT = 315;
-const int TEMPLOWLIMIT = 270;
-const int HUMHIGHLIMIT = 750;
-const int HUMLOWLIMIT = 600;
+const int TEMPSP = 315;
+const int HUMSP = 700;
+const int TEMPHIGHLIMIT = TEMPSP;
+const int TEMPLOWLIMIT = TEMPSP - 20;
+const int HUMHIGHLIMIT = HUMSP + 50;
+const int HUMLOWLIMIT = HUMSP - 50;
 const unsigned long int TEMPALARMGRACEPERIOD = (1000UL *  60UL * 60UL); //1 hour
 const unsigned long int HUMALARMGRACEPERIOD = (1000UL * 60UL * 60UL * 3); //3 hours
 

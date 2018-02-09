@@ -33,18 +33,18 @@ void Satellite::update(int sensor, int tempRawValue, int humRawValue, unsigned l
 }
 	//// Is temperature between the high and low limits?
 bool Satellite::tempInRange() {
-	bool inRange = (tempRawValue[0] > tempLowLimit && tempRawValue[0] < tempHighLimit);
+	bool inRange = (tempRawValue[0] >= tempLowLimit && tempRawValue[0] <= tempHighLimit);
 	if (hasAdditionalSensor && inRange) {
-		inRange = (tempRawValue[1] > tempLowLimit && tempRawValue[1] < tempHighLimit);
+		inRange = (tempRawValue[1] >= tempLowLimit && tempRawValue[1] <= tempHighLimit);
 	}
 	return inRange;
 }
 
 	//// Is humidity between the high and low limits?
 bool Satellite::humInRange() {
-	bool inRange = (humRawValue[0] > humLowLimit && humRawValue[0] < humHighLimit);
+	bool inRange = (humRawValue[0] >= humLowLimit && humRawValue[0] <= humHighLimit);
 	if (hasAdditionalSensor && inRange) {
-		inRange = (humRawValue[1] > humLowLimit && humRawValue[1] < humHighLimit);
+		inRange = (humRawValue[1] >= humLowLimit && humRawValue[1] <= humHighLimit);
 	}
 	return inRange;
 }
@@ -73,7 +73,7 @@ void Satellite::procAlarms(int sensor, unsigned long int currentTimeElapsed) {
 		if (!tempFirstOOR) {
 			tempFirstOOR = currentTimeElapsed;
 		}
-		else if ((currentTimeElapsed - tempFirstOOR) > tempAlarmGracePeriod || true ) { //really, temp should never be too high
+		else if ((currentTimeElapsed - tempFirstOOR) > tempAlarmGracePeriod || true ) { //temp should never be too high
 			tempHighAlarm = true;
 		}
 		else {} 
@@ -99,7 +99,7 @@ void Satellite::procAlarms(int sensor, unsigned long int currentTimeElapsed) {
 		if (!humFirstOOR) {
 			humFirstOOR = currentTimeElapsed;
 		}
-		else if ((currentTimeElapsed - humFirstOOR) > humAlarmGracePeriod || true ) { //really, temp should never be too high)
+		else if ((currentTimeElapsed - humFirstOOR) > humAlarmGracePeriod || true ) { //humidity should never be too high)
 			humHighAlarm = true;
 		}
 		else {}
