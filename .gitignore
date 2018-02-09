@@ -7,6 +7,7 @@ libraries/SD/*
 libraries/SpacebrewYun/*
 libraries/Temboo/*
 libraries/arduino*
+Adafruit*
 
 Doxy*
 doxy*
