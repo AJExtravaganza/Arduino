@@ -2,17 +2,17 @@
 #define TRANSMISSION
 
 struct Transmission {
-  int xmitterID = -1;
+  int deviceID = -1;
   int tempRawValue[2] = {0, 0}; // Make private, since it's in hundredth-units
   int humRawValue[2] = {0, 0}; // And this also
 	
 	//Constructor for single-sensor satellites
-  Transmission(int xmitterID, int temp, int hum) : xmitterID(xmitterID), tempRawValue{temp, -1}, humRawValue{hum, -1} {
+  Transmission(int deviceID, int temp, int hum) : deviceID(deviceID), tempRawValue{temp, -1}, humRawValue{hum, -1} {
 		
   }
 	
 	// Constructor for double-sensor satellites
-	Transmission(int xmitterID, int temp_0, int hum_0, int temp_1, int hum_1) : xmitterID(xmitterID), tempRawValue{temp_0, temp_1}, humRawValue{hum_0, hum_1}
+	Transmission(int deviceID, int temp_0, int hum_0, int temp_1, int hum_1) : deviceID(deviceID), tempRawValue{temp_0, temp_1}, humRawValue{hum_0, hum_1}
 	{
 		
   }

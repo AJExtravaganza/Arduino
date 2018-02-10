@@ -106,11 +106,11 @@ void clearAllAlarms() {
 
 	//// Translate Transmission data update to raw values
 void update(Transmission received) {
-	satellites[received.xmitterID].update(0, received.getRawTemp(0), received.getRawHum(0), millis());
+	satellites[received.deviceID].update(0, received.getRawTemp(0), received.getRawHum(0), millis());
   //printf("updating sensor 0 with %i, %i\n", received.getRawTemp(0), received.getRawHum(0)); //debug
 
- if (satellites[received.xmitterID].hasAdditionalSensor || true) { //debug forcing conditional for debugging
-	 satellites[received.xmitterID].update(1, received.getRawTemp(1), received.getRawHum(1), millis());
+ if (satellites[received.deviceID].hasAdditionalSensor || true) { //debug forcing conditional for debugging
+	 satellites[received.deviceID].update(1, received.getRawTemp(1), received.getRawHum(1), millis());
   //printf("updating sensor 1 with %i, %i\n", received.getRawTemp(1), received.getRawHum(1)); //debug
  }
 }
@@ -359,35 +359,35 @@ void loop(void) {
         //printf("Just received ");
         // received.printCSV();
         
-        if (satellites[received.xmitterID].deviceUp == false || deviceStatusUnknown[received.xmitterID]) {
-          printf(">STS;%i;1;%lu;\n", received.xmitterID, (millis() / 1000));
-          deviceStatusUnknown[received.xmitterID] = false;
+        if (satellites[received.deviceID].deviceUp == false || deviceStatusUnknown[received.deviceID]) {
+          printf(">STS;%i;1;%lu;\n", received.deviceID, (millis() / 1000));
+          deviceStatusUnknown[received.deviceID] = false;
           
         }
-        satellites[received.xmitterID].deviceUp = true;
-        satellites[received.xmitterID].lastTransmission = millis(); // Update time record of most recent  transmission for deadman purposes.
+        satellites[received.deviceID].deviceUp = true;
+        satellites[received.deviceID].lastTransmission = millis(); // Update time record of most recent  transmission for deadman purposes.
   			
   			update(received); // Update the relevant Satellite object with the new values
   			
-        printf(">DAT;%i;", received.xmitterID); // Output CSV with ID,
+        printf(">DAT;%i;", received.deviceID); // Output CSV with ID,
         printf("%lu;", (millis() / 1000)); // timestamp (seconds since base boot),
         received.printCSV(); // and values.
 
           ////Basic alarm reporting functionality
-        if (satellites[received.xmitterID].tempLowAlarm) {
-          printf(">ALM;%i;LT;Low Temperature;\n", received.xmitterID);
+        if (satellites[received.deviceID].tempLowAlarm) {
+          printf(">ALM;%i;LT;Low Temperature;\n", received.deviceID);
           beep();
         }
-        if (satellites[received.xmitterID].tempHighAlarm) {
-          printf(">ALM;%i;HT;High Temperature;\n", received.xmitterID);
+        if (satellites[received.deviceID].tempHighAlarm) {
+          printf(">ALM;%i;HT;High Temperature;\n", received.deviceID);
           beep();
         }
-        if (satellites[received.xmitterID].humLowAlarm) {
-          printf(">ALM;%i;LH;Low Humidity;\n", received.xmitterID);
+        if (satellites[received.deviceID].humLowAlarm) {
+          printf(">ALM;%i;LH;Low Humidity;\n", received.deviceID);
           beep();
         }
-        if (satellites[received.xmitterID].humHighAlarm) {
-          printf(">ALM;%i;HH;High Humidity;\n", received.xmitterID);
+        if (satellites[received.deviceID].humHighAlarm) {
+          printf(">ALM;%i;HH;High Humidity;\n", received.deviceID);
           beep();
         }
 
