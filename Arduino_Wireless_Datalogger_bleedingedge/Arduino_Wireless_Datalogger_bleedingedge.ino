@@ -1,3 +1,5 @@
+
+	//// Use these if compiling from Arduino IDE ////
 #include <EEPROM.h>
 #include <Wire.h>
 #include "nRF24L01.h"
@@ -9,6 +11,15 @@
 #include "BME280.h"
 #include "mechElec.h"
 
+
+	//// These are for CLion ////
+//#include <cstdint>
+//#include "../libraries/RF24-master/RF24.h"
+//#include "../libraries/RF24-master/nRF24L01.h"
+//#include "../libraries/PuLogger/DeviceSettings.h"
+//#include "../libraries/PuLogger/Transmission.h"
+//#include "../libraries/PuLogger/Satellite.h"
+//#include "../libraries/PuLogger/mechElec.h"
 
 const unsigned int SATELLITES = 1;
 const unsigned int DEVICES = SATELLITES + 1;
@@ -56,16 +67,6 @@ const char* role_friendly_name[] = {"invalid", "base", "satellite"};
 // Declare role and ID
 int deviceID = -1;
 role_e role = role_base;
-
-void setBuzzer(bool state) {
-  digitalWrite(2,(state ? HIGH : LOW));
-}
-
-void beep() {
-  setBuzzer(true);
-  delay(20);
-  setBuzzer(false);
-}
 
 //// Has particular Satellite gone >DEADMANPERIOD without checking in?
 bool deviceFailure(int deviceID) {

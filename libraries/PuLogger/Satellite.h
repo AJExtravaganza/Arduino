@@ -25,7 +25,7 @@ public:
 	bool hasAdditionalSensor; //should be const, with getter
 	unsigned long int lastTransmission;
 	
-	int tempRawValue[2]; //Raw values in deci-units.  Room for 
+	int tempRawValue[2]; //Raw values in deci-units.
   int humRawValue[2];
 	
 	int tempRawAvg;

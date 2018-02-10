@@ -3,22 +3,22 @@
 
 struct Transmission {
   int xmitterID = -1;
-  int tempRaw[2] = {0, 0}; // Make private, since it's in hundredth-units
-  int humRaw[2] = {0, 0}; // And this also
+  int tempRawValue[2] = {0, 0}; // Make private, since it's in hundredth-units
+  int humRawValue[2] = {0, 0}; // And this also
 	
 	//Constructor for single-sensor satellites
-  Transmission(int xmitterID, int temp, int hum) : xmitterID(xmitterID), tempRaw{temp, -1}, humRaw{hum, -1} {
+  Transmission(int xmitterID, int temp, int hum) : xmitterID(xmitterID), tempRawValue{temp, -1}, humRawValue{hum, -1} {
 		
   }
 	
 	// Constructor for double-sensor satellites
-	Transmission(int xmitterID, int temp_0, int hum_0, int temp_1, int hum_1) : xmitterID(xmitterID), tempRaw{temp_0, temp_1}, humRaw{hum_0, hum_1}
+	Transmission(int xmitterID, int temp_0, int hum_0, int temp_1, int hum_1) : xmitterID(xmitterID), tempRawValue{temp_0, temp_1}, humRawValue{hum_0, hum_1}
 	{
 		
   }
 	
-	int getRawTemp(int sensor) {return tempRaw[sensor];}
-	int getRawHum(int sensor) {return humRaw[sensor];}
+	int getRawTemp(int sensor) {return tempRawValue[sensor];}
+	int getRawHum(int sensor) {return humRawValue[sensor];}
   //float getTemp(int sensor) { return float(tempRaw[sensor]) / 10.0;}
   //float getHum(int sensor) { return float(humRaw[sensor]) / 10.0;}
   bool changed( Transmission other, float tempHys, float humHys) {return (abs(getRawTemp(0) - other.getRawTemp(0)) > tempHys || abs(getRawHum(0) - other.getRawHum(0)) > humHys) || abs(getRawTemp(1) - other.getRawTemp(1)) > tempHys || abs(getRawHum(1) - other.getRawHum(1)) > humHys; } //change to raw values later?
