@@ -1,6 +1,7 @@
 
   //// Use these if compiling from Arduino IDE ////
 #include <EEPROM.h>
+#include <SPI.h>
 #include <Wire.h>
 #include "nRF24L01.h"
 #include "RF24.h"
@@ -10,6 +11,8 @@
 #include "Satellite.h"
 #include "BME280.h"
 #include "mechElec.h"
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
 
 
   //// These are for CLion ////
@@ -68,6 +71,15 @@ const char* role_friendly_name[] = {"invalid", "base", "satellite"};
 int deviceID = -1;
 role_e role = role_base;
 
+  //// OLED SCREEN
+#define OLED_RESET 4
+Adafruit_SSD1306 display(OLED_RESET);
+#define LOGO16_GLCD_HEIGHT 16 
+#define LOGO16_GLCD_WIDTH  16 
+#if (SSD1306_LCDHEIGHT != 32)
+#error("Height incorrect, please fix Adafruit_SSD1306.h!");
+#endif
+
 //// Has particular Satellite gone >DEADMANPERIOD without checking in?
 bool deviceFailure(int deviceID) {
 
@@ -115,6 +127,31 @@ void update(Transmission received) {
  }
 }
 
+void updateDisplay(byte temp, byte hum) {
+  display.clearDisplay();
+  display.setTextColor(WHITE);
+  display.setTextSize(2);
+  display.setCursor(8,6);
+  display.print(temp);
+  display.print(char(247));
+  display.print("C ");
+  display.print(hum);
+  display.println("%rh");
+  display.setTextSize(1);
+  display.print(" SP:");
+  display.print(TEMPSP/10);
+  display.print(".");
+  display.print(TEMPSP%10);
+  display.print(char(247));
+  display.print("C SP:");
+  display.print(HUMSP/10);
+  display.print(".");
+  display.print(HUMSP%10);
+  display.print("%");
+  
+  display.display();
+}
+
 void setup(void) {
 
  //// Set buzzer, fan and heater pinModes
@@ -125,6 +162,10 @@ void setup(void) {
   
     //// Start the serial service.
   Serial.begin(57600);
+
+    //// Start the OLED display service
+  display.begin(SSD1306_SWITCHCAPVCC, 0x3C);  // initialize with the I2C addr 0x3C (for the 128x32)
+  display.clearDisplay();
 
     ////Initialise Satellite object deviceIDs
   for (int i = 1; i <= SATELLITES; i++) { 
@@ -246,6 +287,8 @@ void loop(void) {
         satellites[received.deviceID].lastTransmission = millis(); // Update time record of most recent  transmission for deadman purposes.
         
         update(received); // Update the relevant Satellite object with the new values
+
+        updateDisplay(int(satellites[received.deviceID].getTemp()), int(satellites[received.deviceID].getHum())); // Update the OLED display
         
         printf(">DAT;%i;", received.deviceID); // Output CSV with ID,
         printf("%lu;", (millis() / 1000)); // timestamp (seconds since base boot),

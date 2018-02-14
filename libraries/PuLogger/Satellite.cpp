@@ -124,6 +124,14 @@ void Satellite::clearAlarms() {
 	//humFirstOOR = 0;
 }
 
+float Satellite::getTemp() {
+	return  float(tempRawValue[0]) / 10.0;
+}
+
+float Satellite::getHum() {
+	return  float(humRawValue[0]) / 10.0;
+}
+
 float Satellite::getTemp(int sensor) {
 	return  float(tempRawValue[sensor]) / 10.0;
 }
