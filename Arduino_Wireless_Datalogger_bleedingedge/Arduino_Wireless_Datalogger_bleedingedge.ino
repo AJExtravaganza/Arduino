@@ -42,6 +42,7 @@ const unsigned long int SATELLITELOOPPERIOD = SENSORPOLLPERIOD / 3UL; // Must be
 bool hasAdditionalSensor = true; //fixme change back to false when EEPROM stuff is implemented;
 uint8_t sensorAddress[2] = {0x77, 0x76};
 
+
 	////Satellite objects for base station
 Satellite satellites[DEVICES];
 
@@ -302,21 +303,21 @@ void loop(void) {
         // Drive fans 
         if (max(hum_act[0], hum_act[1]) < HUMSP) {
           startFan();
-          printf("Fan Start\n");
+          //printf("Fan Start\n");
         }
         else if (max(hum_act[0], hum_act[1]) >= HUMSP) {
           stopFan();
-          printf("Fan Stop\n");
+          //printf("Fan Stop\n");
         }
 
         //Drive heater
         if (max(temp_act[0], temp_act[1]) < TEMPSP) {
           startHeat();
-          printf("Heat Start\n");
+          //printf("Heat Start\n");
         }
-        else if (max(temp_act[0], temp_act[1]) >= TEMPHIGHLIMIT) {
+        else if (max(temp_act[0], temp_act[1]) >= TEMPSP) {
           stopHeat();
-          printf("Heat Stop\n");
+          //printf("Heat Stop\n");
         }
         
         delay(SATELLITELOOPPERIOD); // Loop poll rate.  Adjust sensor poll rate later to match to reduce power consumption.

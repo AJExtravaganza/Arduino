@@ -2,9 +2,9 @@
 #define SATELLITE
 
 	//// Alarm thresholds are defined here
-const int TEMPSP = 305;
-const int HUMSP = 700;
-const int TEMPHIGHLIMIT = TEMPSP;
+const int TEMPSP = 250;
+const int HUMSP = 650;
+const int TEMPHIGHLIMIT = TEMPSP + 25;
 const int TEMPLOWLIMIT = TEMPSP - 25;
 const int HUMHIGHLIMIT = HUMSP + 50;
 const int HUMLOWLIMIT = HUMSP - 50;
@@ -52,10 +52,12 @@ public:
 	void procAlarms(int sensor, unsigned long int currentTimeElapsed);
 	void clearAlarms();
 	
-  float getTemp();
-  float getHum();
+  float getMaxTemp();
+  float getMaxHum();
 	float getTemp(int sensor);
   float getHum(int sensor);
+	
+	int maximum(int a, int b);
 	
 };
 

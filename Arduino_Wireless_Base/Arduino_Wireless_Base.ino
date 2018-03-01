@@ -93,45 +93,22 @@ bool deviceFailure(int deviceID) {
     return !satellites[deviceID].deviceUp;
 }
 
-  //// Check for new device time-outs and send failure any failure status to gui.
-bool checkDeviceTimeout(int deviceID, bool &deviceStatusUnknown) {
-  bool wasLive = satellites[deviceID].deviceUp;
-
-  if (deviceFailure(deviceID)) { //Check for devices that haven't touched base recently.  If such exists,
-    if (wasLive || deviceStatusUnknown) {  // If state has changed, or satellite hasn't checked in in the first DEADMANPERIOD of runtime
-      printf(">STS;%i;0;%lu\n", deviceID, (millis() / 1000)); // Set device status DOWN.
-     deviceStatusUnknown = false;
-    }
-    else {
-      //printf("Device still down.\n");
-    }
-   
-    beep();
-  }
-}
-
-void clearAllAlarms() {
-  for (int i = 1; i < DEVICES; i++) {
-    satellites[i].clearAlarms();
-  }
-}
-
-  //// Translate Transmission data update to raw values
-void update(Transmission received) {
-  satellites[received.deviceID].update(0, received.getRawTemp(0), received.getRawHum(0), millis());
-  //printf("updating sensor 0 with %i, %i\n", received.getRawTemp(0), received.getRawHum(0)); //debug
-
- if (satellites[received.deviceID].hasAdditionalSensor || true) { //debug forcing conditional for debugging
-   satellites[received.deviceID].update(1, received.getRawTemp(1), received.getRawHum(1), millis());
-  //printf("updating sensor 1 with %i, %i\n", received.getRawTemp(1), received.getRawHum(1)); //debug
- }
+void displayCommsError() {
+  display.clearDisplay();
+  display.setTextColor(WHITE);
+  display.setTextSize(2);
+  display.setCursor(5,10);
+  display.print("COMMS FAIL");
+  display.display();
 }
 
 void updateDisplay(byte temp, byte hum) {
   display.clearDisplay();
   display.setTextColor(WHITE);
   display.setTextSize(2);
+  //display.setCursor(10,6);
   display.setCursor(8,6);
+  
   display.print(temp);
   display.print(char(247));
   display.print("C ");
@@ -150,6 +127,40 @@ void updateDisplay(byte temp, byte hum) {
   display.print("%");
   
   display.display();
+}
+
+  //// Check for new device time-outs and send failure any failure status to gui.
+bool checkDeviceTimeout(int deviceID, bool &deviceStatusUnknown) {
+  bool wasLive = satellites[deviceID].deviceUp;
+
+  if (deviceFailure(deviceID)) { //Check for devices that haven't touched base recently.  If such exists,
+    if (wasLive || deviceStatusUnknown) {  // If state has changed, or satellite hasn't checked in in the first DEADMANPERIOD of runtime
+      printf(">STS;%i;0;%lu\n", deviceID, (millis() / 1000)); // Set device status DOWN.
+     deviceStatusUnknown = false;
+    }
+    else {
+      //printf("Device still down.\n");
+    }
+   displayCommsError();
+    //beep();
+  }
+}
+
+void clearAllAlarms() {
+  for (int i = 1; i < DEVICES; i++) {
+    satellites[i].clearAlarms();
+  }
+}
+
+  //// Translate Transmission data update to raw values
+void update(Transmission received) {
+  satellites[received.deviceID].update(0, received.getRawTemp(0), received.getRawHum(0), millis());
+  //printf("updating sensor 0 with %i, %i\n", received.getRawTemp(0), received.getRawHum(0)); //debug
+
+ if (satellites[received.deviceID].hasAdditionalSensor || true) { //debug forcing conditional for debugging
+   satellites[received.deviceID].update(1, received.getRawTemp(1), received.getRawHum(1), millis());
+  //printf("updating sensor 1 with %i, %i\n", received.getRawTemp(1), received.getRawHum(1)); //debug
+ }
 }
 
 void setup(void) {
@@ -267,6 +278,7 @@ void loop(void) {
         //// Check each device's status
       for (int i = 1; i <= SATELLITES; i++) {
         if (checkDeviceTimeout(i, deviceStatusUnknown[i])) {
+          displayCommsError();
           beep();
         }
       }
@@ -288,7 +300,7 @@ void loop(void) {
         
         update(received); // Update the relevant Satellite object with the new values
 
-        updateDisplay(int(satellites[received.deviceID].getTemp()), int(satellites[received.deviceID].getHum())); // Update the OLED display
+        updateDisplay(int(satellites[received.deviceID].getMaxTemp()), int(satellites[received.deviceID].getMaxHum())); // Update the OLED display
         
         printf(">DAT;%i;", received.deviceID); // Output CSV with ID,
         printf("%lu;", (millis() / 1000)); // timestamp (seconds since base boot),
