@@ -4,10 +4,10 @@
 	//// Alarm thresholds are defined here
 const int TEMPSP = 250;
 const int HUMSP = 650;
-const int TEMPHIGHLIMIT = TEMPSP + 25;
-const int TEMPLOWLIMIT = TEMPSP - 25;
-const int HUMHIGHLIMIT = HUMSP + 50;
-const int HUMLOWLIMIT = HUMSP - 50;
+const int TEMPHIGHLIMIT = TEMPSP + 2;
+const int TEMPLOWLIMIT = TEMPSP - 5;
+const int HUMHIGHLIMIT = HUMSP + 5;
+const int HUMLOWLIMIT = HUMSP - 5;
 const unsigned long int TEMPALARMGRACEPERIOD = (1000UL *  60UL * 60UL * 5); //5 hours (4.5hrs recovery measured from 24C, which should be far below worst-case in normal use)
 const unsigned long int HUMALARMGRACEPERIOD = (1000UL * 60UL * 60UL * 2); //2 hours (1hr recovery measured, with 100% tolerance)
 

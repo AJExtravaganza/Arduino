@@ -40,7 +40,8 @@ const unsigned long int SATELLITELOOPPERIOD = SENSORPOLLPERIOD / 3UL; // Must be
 
   //// Global variable to store address of current sensor to poll
 bool hasAdditionalSensor = true; //fixme change back to false when EEPROM stuff is implemented;
-uint8_t sensorAddress[2] = {0x77, 0x76};
+//uint8_t sensorAddress[2] = {0x77, 0x76};
+uint8_t sensorAddress[2] = {0x76, 0x76};
 
 
 	////Satellite objects for base station
@@ -301,21 +302,21 @@ void loop(void) {
 			}
         
         // Drive fans 
-        if (max(hum_act[0], hum_act[1]) < HUMSP) {
+        if (max(hum_act[0], hum_act[1]) < (HUMSP + 4)) {
           startFan();
           //printf("Fan Start\n");
         }
-        else if (max(hum_act[0], hum_act[1]) >= HUMSP) {
+        else if (max(hum_act[0], hum_act[1]) >= (HUMSP + 4)) {
           stopFan();
           //printf("Fan Stop\n");
         }
 
         //Drive heater
-        if (max(temp_act[0], temp_act[1]) < TEMPSP) {
+        if (max(temp_act[0], temp_act[1]) < TEMPSP + 1) {
           startHeat();
           //printf("Heat Start\n");
         }
-        else if (max(temp_act[0], temp_act[1]) >= TEMPSP) {
+        else if (max(temp_act[0], temp_act[1]) >= TEMPSP + 1) {
           stopHeat();
           //printf("Heat Stop\n");
         }
